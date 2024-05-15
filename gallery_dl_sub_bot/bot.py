@@ -5,6 +5,7 @@ import re
 from telethon import TelegramClient, events
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
+from gallery_dl_sub_bot.link_fixer import LinkFixer
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ class Bot:
             "gallery_dl_sub_bot", self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
         )
         self.dl_manager = GalleryDLManager()
+        self.link_fixer = LinkFixer()
 
     def run(self) -> None:
         self.client.start(bot_token=self.config["telegram"]["bot_token"])
@@ -54,10 +56,12 @@ class Bot:
         if not links:
             await event.respond("Could not find any links in that message")
             raise events.StopPropagation
+        # Fix all the links
+        fixed_links = [self.link_fixer.fix_link(l) for l in links]
         # Tell the user the links
-        await event.respond("Found these links:\n" + "\n".join(html.escape(l) for l in links), parse_mode="html")
+        await event.respond("Found these links:\n" + "\n".join(html.escape(l) for l in fixed_links), parse_mode="html")
         # Check them in gallery-dl
-        for link in links:
+        for link in fixed_links:
             resp = await self.dl_manager.run(["--dump-json", link])
             await event.respond(f"Gallery DL said:\n<pre>{html.escape(resp)}</pre>", parse_mode="html")
         raise events.StopPropagation

@@ -1,0 +1,10 @@
+link_fixes:
+  - from: fixupx.com
+    to: twitter.com
+  - from: fxtwitter.com
+    to: twitter.com
+  - from: vxtwitter.com
+    to: twitter.com
+  - from: twitter.com
+    to:
+      query: ""
