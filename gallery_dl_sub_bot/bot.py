@@ -1,4 +1,6 @@
+import html
 import logging
+import re
 
 from telethon import TelegramClient, events
 
@@ -18,6 +20,7 @@ class Bot:
         # Register functions
         self.client.add_event_handler(self.start, events.NewMessage(pattern="/start", incoming=True))
         self.client.add_event_handler(self.boop, events.NewMessage(pattern="/beep", incoming=True))
+        self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         # Start listening
         try:
             logger.info("Starting bot")
@@ -27,6 +30,24 @@ class Bot:
 
     async def boop(self, event: events.NewMessage.Event) -> None:
         await event.respond("Boop!")
+        raise events.StopPropagation
 
     async def start(self, event: events.NewMessage.Event) -> None:
         await event.respond("Hey there! I'm not a very good bot yet, I'm quite early in development.")
+        raise events.StopPropagation
+
+    async def check_for_links(self, event: events.NewMessage.Event) -> None:
+        link_regex = re.compile(r"(https?://|www\.|\S+\.com)\S+", re.I)
+        links = []
+        for link in link_regex.finditer(event.message.text):
+            links.append(link.group(0))
+        if event.message.buttons:
+            for button_row in event.message.buttons:
+                for button in button_row:
+                    if button.url:
+                        links.append(button.url)
+        if not links:
+            await event.respond("Could not find any links in that message")
+            raise events.StopPropagation
+        await event.respond("Found these links:\n" + "\n".join(html.escape(l) for l in links), parse_mode="html")
+        raise events.StopPropagation
