@@ -70,9 +70,11 @@ class Bot:
             await event.reply("Could not find any links in that message")
             raise events.StopPropagation
         # Fix all the links
-        fixed_links = [self.link_fixer.fix_link(l) for l in links]
-        # Tell the user the links
-        await event.reply("Found these links:\n" + "\n".join(html.escape(l) for l in fixed_links), parse_mode="html")
+        fixed_links = [self.link_fixer.fix_link(l) for l in links]  # TODO remove duplicates
+        if len(fixed_links) > 1:
+            # Tell the user all the links
+            lines = [f"- {html.escape(l)}" for l in fixed_links]
+            await event.reply("Found these links:\n" + "\n".join(lines), parse_mode="html")
         # Check them in gallery-dl
         await asyncio.gather(*(self._handle_link(link, event) for link in fixed_links))
         raise events.StopPropagation
@@ -89,16 +91,16 @@ class Bot:
             await evt.reply(f"Failed to download link {html.escape(link)} :(")
             raise e
         lines = resp.strip().split("\n")
-        await evt.reply(f"Found {len(lines)} images(s) in link", parse_mode="html")
+        await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
         await evt.delete()
         if len(lines) < 10:
-            await evt.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
+            await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
         else:
             hidden_link = hidden_data({
                 "path": dl_path,
                 "link": link,
             })
-            await evt.reply(
+            await event.reply(
                 f"Would you like to download these files as a zip?{hidden_link}",
                 parse_mode="html",
                 buttons=[[
@@ -106,7 +108,7 @@ class Bot:
                     Button.inline("No thanks", "dl_zip:no"),
                 ]]
             )
-            await evt.reply(
+            await event.reply(
                 f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
                 parse_mode="html",
                 buttons=[[
