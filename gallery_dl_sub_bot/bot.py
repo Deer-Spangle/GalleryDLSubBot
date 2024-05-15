@@ -17,7 +17,7 @@ class Bot:
         self.client = TelegramClient(
             "gallery_dl_sub_bot", self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
         )
-        self.dl_manager = GalleryDLManager()
+        self.dl_manager = GalleryDLManager("config_gallery_dl.json")
         self.link_fixer = LinkFixer()
 
     def run(self) -> None:

@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class GalleryDLManager:
-    def __init__(self):
+    def __init__(self, config_path: Optional[str] = None):
+        self.config_path: Optional[str] = config_path
         self.last_update: Optional[datetime.datetime] = None
 
     async def update_tool(self) -> None:
@@ -22,5 +23,7 @@ class GalleryDLManager:
     async def run(self, args: list[str]) -> str:
         if self.update_needed():
             await self.update_tool()
+        if self.config_path:
+            args = ["-c", self.config_path, *args]
         resp = await run_cmd(["gallery-dl", *args])
         return resp
