@@ -165,3 +165,7 @@ gallery_dl_sub_bot.session
 # Config files
 config.json
 config_gallery_dl.json
+
+# Logs and storage
+logs/
+store/
