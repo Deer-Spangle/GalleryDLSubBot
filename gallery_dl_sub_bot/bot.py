@@ -13,6 +13,7 @@ from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
 from gallery_dl_sub_bot.link_fixer import LinkFixer
+from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
 logger = logging.getLogger(__name__)
 
