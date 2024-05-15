@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "gallery-dl-sub-bot"
+version = "0.1.0"
+description = "A telegram bot to subscribe to (and archive) galleries using gallery-dl"
+authors = ["Deer-Spangle <deer@spangle.org.uk>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "gallery_dl_sub_bot"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+telethon = "^1.35.0"
+pyyaml = "^6.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
