@@ -39,11 +39,11 @@ class Bot:
             logger.info("Bot sleepy bye-bye time")
 
     async def boop(self, event: events.NewMessage.Event) -> None:
-        await event.respond("Boop!")
+        await event.reply("Boop!")
         raise events.StopPropagation
 
     async def start(self, event: events.NewMessage.Event) -> None:
-        await event.respond("Hey there! I'm not a very good bot yet, I'm quite early in development.")
+        await event.reply("Hey there! I'm not a very good bot yet, I'm quite early in development.")
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
@@ -59,34 +59,34 @@ class Bot:
                     if button.url:
                         links.append(button.url)
         if not links:
-            await event.respond("Could not find any links in that message")
+            await event.reply("Could not find any links in that message")
             raise events.StopPropagation
         # Fix all the links
         fixed_links = [self.link_fixer.fix_link(l) for l in links]
         # Tell the user the links
-        await event.respond("Found these links:\n" + "\n".join(html.escape(l) for l in fixed_links), parse_mode="html")
+        await event.reply("Found these links:\n" + "\n".join(html.escape(l) for l in fixed_links), parse_mode="html")
         # Check them in gallery-dl
         await asyncio.gather(*(self._handle_link(link, event) for link in fixed_links))
         raise events.StopPropagation
 
     async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
         dl_path = f"store/downloads/{uuid.uuid4()}/"
-        evt = await event.respond(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html")
+        evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html")
         try:
             # TODO: queueing
             # TODO: in progress message
             resp = await self.dl_manager.run(["--write-metadata", "--write-info-json", "-d", dl_path, link])
         except Exception as e:
             logger.error(f"Failed to download link {link}", exc_info=e)
-            await evt.respond(f"Failed to download link {html.escape(link)} :(")
+            await evt.reply(f"Failed to download link {html.escape(link)} :(")
             raise e
         lines = resp.strip().split("\n")
-        await evt.respond(f"Downloaded {len(lines)} images(s)", parse_mode="html")
+        await evt.reply(f"Found {len(lines)} images(s) in link", parse_mode="html")
         await evt.delete()
         if len(lines) < 10:
-            await evt.respond(f"{html.escape(link)}", parse_mode="html", file=lines)
+            await evt.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
         else:
-            await evt.respond(
+            await evt.reply(
                 f"Would you like to download these files as a zip?{hidden_data({'path': dl_path})}",
                 parse_mode="html",
                 buttons=[
@@ -94,7 +94,7 @@ class Bot:
                     [Button.inline("No thanks", "dl_zip:no")],
                 ]
             )
-            await evt.respond(f"Would you like to subscribe to {html.escape(link)}?", parse_mode="html")  # TODO
+            await evt.reply(f"Would you like to subscribe to {html.escape(link)}?", parse_mode="html")  # TODO
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
         query_data = event.query.data
@@ -112,6 +112,6 @@ class Bot:
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_path = f"store/downloads/{uuid.uuid4()}"
             shutil.make_archive(zip_path, "zip", dl_path)
-            await menu_msg.respond("Here is the zip archive of that feed", file=f"{zip_path}.zip")
+            await menu_msg.reply("Here is the zip archive of that feed", file=f"{zip_path}.zip")
             await menu_msg.delete()
             raise events.StopPropagation
