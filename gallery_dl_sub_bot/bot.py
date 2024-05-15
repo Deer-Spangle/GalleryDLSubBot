@@ -1,6 +1,7 @@
 import asyncio
 import html
 import logging
+import pathlib
 import re
 import shutil
 import uuid
@@ -31,6 +32,7 @@ class Bot:
         self.client.add_event_handler(self.boop, events.NewMessage(pattern="/beep", incoming=True))
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
+        self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
         # Start listening
         try:
             logger.info("Starting bot")
@@ -86,15 +88,26 @@ class Bot:
         if len(lines) < 10:
             await evt.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
         else:
+            hidden_link = hidden_data({
+                "path": dl_path,
+                "link": link,
+            })
             await evt.reply(
-                f"Would you like to download these files as a zip?{hidden_data({'path': dl_path})}",
+                f"Would you like to download these files as a zip?{hidden_link}",
                 parse_mode="html",
-                buttons=[
-                    [Button.inline("Yes", "dl_zip:yes")],
-                    [Button.inline("No thanks", "dl_zip:no")],
-                ]
+                buttons=[[
+                    Button.inline("Yes", "dl_zip:yes"),
+                    Button.inline("No thanks", "dl_zip:no"),
+                ]]
             )
-            await evt.reply(f"Would you like to subscribe to {html.escape(link)}?", parse_mode="html")  # TODO
+            await evt.reply(
+                f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
+                parse_mode="html",
+                buttons=[[
+                    Button.inline("Yes, subscribe", "subscribe:yes"),
+                    Button.inline("No thanks", "subscribe:no"),
+                ]]
+            )
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
         query_data = event.query.data
@@ -103,6 +116,7 @@ class Bot:
         menu_msg = await event.get_message()
         menu_data = parse_hidden_data(menu_msg)
         dl_path = menu_data["path"]
+        link = menu_data["link"]
         if query_resp == b"no":
             await menu_msg.delete()
             logger.info(f"Removing download path: {dl_path}")
@@ -112,6 +126,28 @@ class Bot:
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_path = f"store/downloads/{uuid.uuid4()}"
             shutil.make_archive(zip_path, "zip", dl_path)
-            await menu_msg.reply("Here is the zip archive of that feed", file=f"{zip_path}.zip")
+            link_msg = await menu_msg.get_reply_message()
+            await link_msg.reply(f"Here is the zip archive of {html.escape(link)}", file=f"{zip_path}.zip")
             await menu_msg.delete()
             raise events.StopPropagation
+        await event.answer("Unrecognised response")
+
+    async def handle_subscribe_callback(self, event: events.CallbackQuery.Event) -> None:
+        query_data = event.query.data
+        query_resp = query_data.removeprefix(b"subscribe:")
+        logger.info(f"Callback query pressed: {query_data}")
+        menu_msg = await event.get_message()
+        menu_data = parse_hidden_data(menu_msg)
+        dl_path = menu_data["path"]
+        link = menu_data["link"]
+        if query_resp == b"no":
+            await menu_msg.delete()
+            raise events.StopPropagation
+        if query_resp == b"yes":
+            menu_msg.edit("⏳ Subscribing...", buttons=None)
+            sub_id = uuid.uuid4()
+            sub_path = f"store/subscriptions/{sub_id}"
+            if pathlib.Path(dl_path).exists():
+                shutil.copy2(dl_path, sub_path)
+            menu_msg.reply("Actually, I don't know how to handle this yet.")  # TODO
+        await event.answer("Unrecognised response")
