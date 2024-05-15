@@ -4,6 +4,8 @@ import re
 
 from telethon import TelegramClient, events
 
+from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,6 +16,7 @@ class Bot:
         self.client = TelegramClient(
             "gallery_dl_sub_bot", self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
         )
+        self.dl_manager = GalleryDLManager()
 
     def run(self) -> None:
         self.client.start(bot_token=self.config["telegram"]["bot_token"])
@@ -39,8 +42,10 @@ class Bot:
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
         link_regex = re.compile(r"(https?://|www\.|\S+\.com)\S+", re.I)
         links = []
+        # Find links in text
         for link in link_regex.finditer(event.message.text):
             links.append(link.group(0))
+        # Find links in buttons
         if event.message.buttons:
             for button_row in event.message.buttons:
                 for button in button_row:
@@ -49,5 +54,10 @@ class Bot:
         if not links:
             await event.respond("Could not find any links in that message")
             raise events.StopPropagation
+        # Tell the user the links
         await event.respond("Found these links:\n" + "\n".join(html.escape(l) for l in links), parse_mode="html")
+        # Check them in gallery-dl
+        for link in links:
+            resp = await self.dl_manager.run(["--dump-json", link])
+            await event.respond(f"Gallery DL said:\n<pre>{html.escape(resp)}</pre>", parse_mode="html")
         raise events.StopPropagation
