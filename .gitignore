@@ -165,6 +165,7 @@ gallery_dl_sub_bot.session
 # Config files
 config.json
 config_gallery_dl.json
+trusted_users.yaml
 
 # Logs and storage
 logs/
