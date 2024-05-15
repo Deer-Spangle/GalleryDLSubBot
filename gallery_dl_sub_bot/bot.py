@@ -1,6 +1,7 @@
 import asyncio
 import html
 import logging
+import os
 import pathlib
 import re
 import shutil
@@ -95,6 +96,7 @@ class Bot:
         await evt.delete()
         if len(lines) < 10:
             await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
+            shutil.rmtree(dl_path)
         else:
             hidden_link = hidden_data({
                 "path": dl_path,
@@ -137,6 +139,8 @@ class Bot:
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(f"Here is the zip archive of {html.escape(link)}", file=f"{zip_path}.zip")
             await menu_msg.delete()
+            shutil.rmtree(dl_path)
+            os.unlink(f"{zip_path}.zip")
             raise events.StopPropagation
         await event.answer("Unrecognised response")
 
