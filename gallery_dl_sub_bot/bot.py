@@ -8,6 +8,7 @@ import uuid
 
 from telethon import TelegramClient, events, Button
 
+from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
 from gallery_dl_sub_bot.link_fixer import LinkFixer
@@ -23,6 +24,8 @@ class Bot:
             "gallery_dl_sub_bot", self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
         )
         self.dl_manager = GalleryDLManager("config_gallery_dl.json")
+        self.auth_manager = AuthManager("trusted_users.yaml")
+        self.sub_manager = SubscriptionManager()
         self.link_fixer = LinkFixer()
 
     def run(self) -> None:
@@ -49,6 +52,9 @@ class Bot:
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
+        if not self.auth_manager.user_is_trusted(event.message.peer_id.user_id):
+            await event.reply("Apologies, you are not authorised to operate this bot")
+            raise events.StopPropagation
         link_regex = re.compile(r"(https?://|www\.|\S+\.com)\S+", re.I)
         links = []
         # Find links in text
