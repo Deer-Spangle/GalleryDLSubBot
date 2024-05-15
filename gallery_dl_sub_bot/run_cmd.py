@@ -34,7 +34,7 @@ async def log_stream(stream: StreamReader, timeout: int = DEFAULT_TIMEOUT, prefi
                 # EOF reached
                 logger.debug("Stream ended %s", prefix)
                 break
-            line = line_bytes.decode()
+            line = line_bytes.decode().rstrip("\n")
             logger.info(prefix + line)
             lines.append(line)
     except asyncio.TimeoutError:
