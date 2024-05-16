@@ -1,6 +1,7 @@
 import dataclasses
 import datetime
 import json
+import os.path
 import shutil
 import uuid
 from typing import Optional
@@ -93,7 +94,7 @@ class SubscriptionManager:
         if matching_sub:
             new_path = matching_sub.path
         # Copy files
-        if not matching_sub:
+        if not matching_sub and os.path.exists(current_path):
             shutil.copy2(current_path, new_path)
         # Create destination
         now_date = datetime.datetime.now(datetime.timezone.utc)
