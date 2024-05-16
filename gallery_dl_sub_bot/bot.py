@@ -103,6 +103,7 @@ class Bot:
             hidden_link = hidden_data({
                 "path": dl_path,
                 "link": link,
+                "user_id": str(event.message.peer_id.user_id),
             })
             await event.reply(
                 f"Would you like to download these files as a zip?{hidden_link}",
@@ -126,14 +127,22 @@ class Bot:
         query_resp = query_data.removeprefix(b"dl_zip:")
         logger.info(f"Callback query pressed: {query_data}")
         menu_msg = await event.get_message()
+        # Parse menu data
         menu_data = parse_hidden_data(menu_msg)
         dl_path = menu_data["path"]
         link = menu_data["link"]
+        user_id = int(menu_data["user_id"])
+        # Check button is pressed by user who summoned the menu
+        if event.sender_id != user_id:
+            await event.answer("Unauthorized menu use")
+            raise events.StopPropagation
+        # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
             logger.info(f"Removing download path: {dl_path}")
             shutil.rmtree(dl_path)
             raise events.StopPropagation
+        # Handle yes button
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_path = f"store/downloads/{uuid.uuid4()}"
@@ -144,6 +153,7 @@ class Bot:
             shutil.rmtree(dl_path)
             os.unlink(f"{zip_path}.zip")
             raise events.StopPropagation
+        # Handle other callback data
         await event.answer("Unrecognised response")
 
     async def handle_subscribe_callback(self, event: events.CallbackQuery.Event) -> None:
@@ -151,12 +161,16 @@ class Bot:
         query_resp = query_data.removeprefix(b"subscribe:")
         logger.info(f"Callback query pressed: {query_data}")
         menu_msg = await event.get_message()
+        # Parse menu data
         menu_data = parse_hidden_data(menu_msg)
         dl_path = menu_data["path"]
         link = menu_data["link"]
+        user_id = int(menu_data["user_id"])
+        # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
             raise events.StopPropagation
+        # Handle yes button press
         if query_resp == b"yes":
             menu_msg.edit("⏳ Subscribing...", buttons=None)
             sub_id = uuid.uuid4()
