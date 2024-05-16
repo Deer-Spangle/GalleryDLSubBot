@@ -173,9 +173,8 @@ class Bot:
         # Handle yes button press
         if query_resp == b"yes":
             menu_msg.edit("⏳ Subscribing...", buttons=None)
-            sub_id = uuid.uuid4()
-            sub_path = f"store/subscriptions/{sub_id}"
-            if pathlib.Path(dl_path).exists():
-                shutil.copy2(dl_path, sub_path)
-            menu_msg.reply("Actually, I don't know how to handle this yet.")  # TODO
+            await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
+            menu_msg.reply(f"Subscription created for {html.escape(link)}")
+            raise events.StopPropagation
+        # Handle other callback data
         await event.answer("Unrecognised response")

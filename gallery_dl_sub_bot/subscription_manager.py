@@ -116,6 +116,7 @@ class SubscriptionManager:
             now_date,
         )
         self.subscriptions.append(sub)
+        self.save()
         return sub
 
     async def remove_subscription(self, link: str, chat_id: int) -> None:
@@ -130,3 +131,4 @@ class SubscriptionManager:
         if len(matching_sub.destinations) == 0:
             self.subscriptions.remove(matching_sub)
             shutil.rmtree(matching_sub.path)
+        self.save()
