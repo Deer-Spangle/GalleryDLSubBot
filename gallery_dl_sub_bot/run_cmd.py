@@ -6,7 +6,7 @@ from typing import TypeVar, Optional, Tuple
 
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
-DEFAULT_TIMEOUT = 5 * 60
+DEFAULT_TIMEOUT = 60 * 60
 CLOSE_TIMEOUT = 10
 
 
