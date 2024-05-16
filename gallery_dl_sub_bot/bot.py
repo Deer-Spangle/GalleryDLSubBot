@@ -83,6 +83,7 @@ class Bot:
 
     async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
         dl_path = f"store/downloads/{uuid.uuid4()}/"
+        # TODO: If subscription exists, use that
         evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html")
         try:
             # TODO: queueing
