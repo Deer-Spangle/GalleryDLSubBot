@@ -1,11 +1,20 @@
+import asyncio
 import dataclasses
 import datetime
+import html
 import json
+import logging
 import os.path
 import shutil
 import uuid
 from typing import Optional
 
+from telethon import TelegramClient
+
+from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
+
+
+logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class SubscriptionDestination:
@@ -62,8 +71,11 @@ class Subscription:
 
 class SubscriptionManager:
     CONFIG_FILE = "subscriptions.json"
+    SUB_UPDATE_AFTER = datetime.timedelta(hours=12)
 
-    def __init__(self) -> None:
+    def __init__(self, client: TelegramClient, dl_manager: GalleryDLManager) -> None:
+        self.client = client
+        self.dl_manager = dl_manager
         try:
             with open(self.CONFIG_FILE, "r") as f:
                 config_data = json.load(f)
@@ -72,6 +84,7 @@ class SubscriptionManager:
         self.subscriptions = [
             Subscription.from_json(sub_data) for sub_data in config_data.get("subscriptions", [])
         ]
+        self.running = False
 
     def save(self) -> None:
         config_data = {
@@ -131,4 +144,44 @@ class SubscriptionManager:
         if len(matching_sub.destinations) == 0:
             self.subscriptions.remove(matching_sub)
             shutil.rmtree(matching_sub.path)
+        self.save()
+
+    async def start(self) -> None:
+        await asyncio.create_task(self.run())
+
+    async def run(self) -> None:
+        self.running = True
+        while self.running:
+            for sub in self.subscriptions[:]:
+                # Check if subscription needs update
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if (now - sub.last_check_date) < self.SUB_UPDATE_AFTER:
+                    continue
+                # Try and fetch update
+                try:
+                    sub.last_check_date = now
+                    new_items = await self.dl_manager.download(sub.link, sub.path)
+                except Exception as e:
+                    logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
+                    sub.failed_checks += 1
+                    continue
+                # Update timestamps
+                now = datetime.datetime.now(datetime.timezone.utc)
+                sub.last_check_date = now
+                sub.last_successful_check_date = now
+                # Send items to destinations
+                for new_item in new_items[::-1]:
+                    file_handle = await self.client.upload_file(new_item)
+                    # media = InputMediaUploadedPhoto(file_handle)
+                    for dest in sub.destinations:
+                        await self.client.send_message(
+                            entity=dest.chat_id,
+                            file=file_handle,
+                            message=f"Update on feed: {html.escape(sub.link)}",
+                            parse_mode="html",
+                        )
+            await asyncio.sleep(20)
+
+    def stop(self) -> None:
+        self.running = False
         self.save()

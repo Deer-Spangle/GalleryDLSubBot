@@ -27,7 +27,7 @@ class Bot:
         )
         self.dl_manager = GalleryDLManager("config_gallery_dl.json")
         self.auth_manager = AuthManager("trusted_users.yaml")
-        self.sub_manager = SubscriptionManager()
+        self.sub_manager = SubscriptionManager(self.client, self.dl_manager)
         self.link_fixer = LinkFixer()
 
     def run(self) -> None:
@@ -40,9 +40,13 @@ class Bot:
         self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
         # Start listening
         try:
+            # Start subscription manager
+            self.sub_manager.start()
+            # Start bot listening
             logger.info("Starting bot")
             self.client.run_until_disconnected()
         finally:
+            self.sub_manager.stop()
             logger.info("Bot sleepy bye-bye time")
 
     async def boop(self, event: events.NewMessage.Event) -> None:
