@@ -16,6 +16,7 @@ from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 
 logger = logging.getLogger(__name__)
 
+
 @dataclasses.dataclass
 class SubscriptionDestination:
     chat_id: int
@@ -108,7 +109,7 @@ class SubscriptionManager:
             new_path = matching_sub.path
         # Copy files
         if not matching_sub and os.path.exists(current_path):
-            shutil.copy2(current_path, new_path)
+            shutil.copytree(current_path, new_path)
         # Create destination
         now_date = datetime.datetime.now(datetime.timezone.utc)
         dest = SubscriptionDestination(
