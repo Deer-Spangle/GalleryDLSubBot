@@ -27,3 +27,7 @@ class GalleryDLManager:
             args = ["-c", self.config_path, *args]
         resp = await run_cmd(["gallery-dl", *args])
         return resp
+
+    async def download(self, link: str, dl_path: str) -> list[str]:
+        resp = await self.run(["--write-metadata", "--write-info-json", "-d", dl_path, link])
+        return resp.strip().split("\n")

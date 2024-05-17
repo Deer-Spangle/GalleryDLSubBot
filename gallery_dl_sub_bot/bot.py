@@ -88,12 +88,11 @@ class Bot:
         try:
             # TODO: queueing
             # TODO: in progress message
-            resp = await self.dl_manager.run(["--write-metadata", "--write-info-json", "-d", dl_path, link])
+            lines = await self.dl_manager.download(link, dl_path)
         except Exception as e:
             logger.error(f"Failed to download link {link}", exc_info=e)
             await evt.reply(f"Failed to download link {html.escape(link)} :(")
             raise e
-        lines = resp.strip().split("\n")
         await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
         await evt.delete()
         if len(lines) < 10:
