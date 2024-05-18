@@ -92,7 +92,7 @@ class SubscriptionManager:
             "subscriptions": [s.to_json() for s in self.subscriptions[:]]
         }
         with open(self.CONFIG_FILE, "w") as f:
-            json.dump(config_data, f)
+            json.dump(config_data, f, indent=2)
 
     def sub_for_link(self, link: str) -> Optional[Subscription]:
         for sub in self.subscriptions[:]:
