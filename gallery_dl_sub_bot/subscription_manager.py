@@ -187,6 +187,7 @@ class SubscriptionManager:
                             message=f"Update on feed: {html.escape(sub.link)}",
                             parse_mode="html",
                         )
+                self.save()
             await asyncio.sleep(20)
 
     def stop(self) -> None:
