@@ -7,6 +7,7 @@ import logging
 import os.path
 import shutil
 import uuid
+from asyncio import Task
 from typing import Optional
 
 from telethon import TelegramClient
@@ -86,6 +87,7 @@ class SubscriptionManager:
             Subscription.from_json(sub_data) for sub_data in config_data.get("subscriptions", [])
         ]
         self.running = False
+        self.runner_task: Optional[Task] = None
 
     def save(self) -> None:
         config_data = {
@@ -147,17 +149,20 @@ class SubscriptionManager:
             shutil.rmtree(matching_sub.path)
         self.save()
 
-    async def start(self) -> None:
-        await asyncio.create_task(self.run())
+    def start(self) -> None:
+        event_loop = asyncio.get_event_loop()
+        self.runner_task = event_loop.create_task(self.run())
 
     async def run(self) -> None:
         self.running = True
+        logger.info("Starting subscription manager")
         while self.running:
             for sub in self.subscriptions[:]:
                 # Check if subscription needs update
                 now = datetime.datetime.now(datetime.timezone.utc)
                 if (now - sub.last_check_date) < self.SUB_UPDATE_AFTER:
                     continue
+                logger.info("Checking subscription to %s", sub.link)
                 # Try and fetch update
                 try:
                     sub.last_check_date = now
@@ -185,4 +190,6 @@ class SubscriptionManager:
 
     def stop(self) -> None:
         self.running = False
+        if self.runner_task:
+            asyncio.run(self.runner_task.get_coro())
         self.save()
