@@ -36,7 +36,10 @@ class GalleryDLManager:
             "--write-info-json",
             "-o", "output.skip=false",
             "-d", dl_path,
-            "--download-archive", archive_path,
+            "--download-archive", str(archive_path),
             link,
         ])
-        return resp.strip().split("\n")
+        resp_clean = resp.strip()
+        if not resp_clean:
+            return []
+        return resp_clean.split("\n")
