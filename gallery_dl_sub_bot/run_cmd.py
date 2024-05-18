@@ -42,14 +42,24 @@ async def log_stream(stream: StreamReader, timeout: int = DEFAULT_TIMEOUT, prefi
     return "\n".join(lines)
 
 
-async def run_cmd(args, timeout: int = DEFAULT_TIMEOUT) -> str:
+def _printable_cmd(args: list[str]) -> str:
+    safe_args = []
+    for arg in args:
+        arg = arg.replace('"', '\"')
+        if " " in arg:
+            arg = f"\"{arg}\""
+        safe_args.append(arg)
+    return " ".join(safe_args)
+
+
+async def run_cmd(args: list[str], timeout: int = DEFAULT_TIMEOUT) -> str:
     proc = await asyncio.create_subprocess_exec(
         *args,
         limit=1024 * 1024 * 5,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    logger.debug("Running subprocess: %s", args)
+    logger.info("Running subprocess: %s", _printable_cmd(args))
     try:
         stdout, stderr = await asyncio.wait_for(log_output(proc), timeout=timeout)
         # A short timeout to close the subprocess, because the above should have ran it to completion.
