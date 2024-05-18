@@ -1,5 +1,6 @@
 import datetime
 import logging
+import pathlib
 from typing import Optional
 
 from gallery_dl_sub_bot.run_cmd import run_cmd
@@ -29,5 +30,13 @@ class GalleryDLManager:
         return resp
 
     async def download(self, link: str, dl_path: str) -> list[str]:
-        resp = await self.run(["--write-metadata", "--write-info-json", "-d", dl_path, link])
+        archive_path = pathlib.Path(dl_path) / "archive.sqlite"
+        resp = await self.run([
+            "--write-metadata",
+            "--write-info-json",
+            "-o", "output.skip=false",
+            "-d", dl_path,
+            "--download-archive", archive_path,
+            link,
+        ])
         return resp.strip().split("\n")
