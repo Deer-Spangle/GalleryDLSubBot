@@ -191,6 +191,7 @@ class SubscriptionManager:
 
     def stop(self) -> None:
         self.running = False
-        if self.runner_task:
-            asyncio.run(self.runner_task.get_coro())
+        loop = asyncio.get_event_loop()
+        if self.runner_task and not self.runner_task.done():
+            loop.run_until_complete(self.runner_task)
         self.save()
