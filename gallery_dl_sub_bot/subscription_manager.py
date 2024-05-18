@@ -5,11 +5,11 @@ import html
 import json
 import logging
 import os.path
-import shutil
 import uuid
 from asyncio import Task
 from typing import Optional
 
+import aioshutil
 from telethon import TelegramClient
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
@@ -111,7 +111,7 @@ class SubscriptionManager:
             new_path = matching_sub.path
         # Copy files
         if not matching_sub and os.path.exists(current_path):
-            shutil.copytree(current_path, new_path)
+            await aioshutil.copytree(current_path, new_path)
         # Create destination
         now_date = datetime.datetime.now(datetime.timezone.utc)
         dest = SubscriptionDestination(
@@ -146,7 +146,7 @@ class SubscriptionManager:
         matching_sub.destinations.remove(found_dest)
         if len(matching_sub.destinations) == 0:
             self.subscriptions.remove(matching_sub)
-            shutil.rmtree(matching_sub.path)
+            await aioshutil.rmtree(matching_sub.path)
         self.save()
 
     def start(self) -> None:

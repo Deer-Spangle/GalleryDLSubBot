@@ -2,11 +2,10 @@ import asyncio
 import html
 import logging
 import os
-import pathlib
 import re
-import shutil
 import uuid
 
+import aioshutil
 from telethon import TelegramClient, events, Button
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
@@ -101,7 +100,7 @@ class Bot:
         await evt.delete()
         if len(lines) < 10:
             await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
-            shutil.rmtree(dl_path)
+            await aioshutil.rmtree(dl_path)
         else:
             hidden_link = hidden_data({
                 "path": dl_path,
@@ -143,17 +142,17 @@ class Bot:
         if query_resp == b"no":
             await menu_msg.delete()
             logger.info(f"Removing download path: {dl_path}")
-            shutil.rmtree(dl_path)
+            await aioshutil.rmtree(dl_path)
             raise events.StopPropagation
         # Handle yes button
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_path = f"store/downloads/{uuid.uuid4()}"
-            shutil.make_archive(zip_path, "zip", dl_path)
+            await aioshutil.make_archive(zip_path, "zip", dl_path)
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(f"Here is the zip archive of {html.escape(link)}", file=f"{zip_path}.zip")
             await menu_msg.delete()
-            shutil.rmtree(dl_path)
+            await aioshutil.rmtree(dl_path)
             os.unlink(f"{zip_path}.zip")
             raise events.StopPropagation
         # Handle other callback data
