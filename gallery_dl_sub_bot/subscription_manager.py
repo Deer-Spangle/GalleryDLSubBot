@@ -171,6 +171,7 @@ class SubscriptionManager:
                     logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
                     sub.failed_checks += 1
                     continue
+                logger.info("There were %s new items in feed: %s", len(new_items), sub.link)
                 # Update timestamps
                 now = datetime.datetime.now(datetime.timezone.utc)
                 sub.last_check_date = now
