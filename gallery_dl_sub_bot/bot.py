@@ -147,7 +147,8 @@ class Bot:
         # Handle yes button
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
-            zip_path = f"store/downloads/{uuid.uuid4()}"
+            zip_filename = self.link_fixer.link_to_filename(link)
+            zip_path = f"store/downloads/{zip_filename}"
             await aioshutil.make_archive(zip_path, "zip", dl_path)
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(f"Here is the zip archive of {html.escape(link)}", file=f"{zip_path}.zip")

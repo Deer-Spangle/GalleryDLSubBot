@@ -26,6 +26,8 @@ class LinkFix:
             parsed = parsed._replace(**{"netloc": self.link_target})
         else:
             parsed = parsed._replace(**self.link_target)
+        # noinspection PyTypeChecker
+        # (For some reason, it thinks this returns Literal[b""])
         return urllib.parse.urlunparse(parsed)
 
 
@@ -55,4 +57,25 @@ class LinkFixer:
         for fix in self.fixes:
             if fix.matches_link(link):
                 link = fix.fix_link(link)
+        return link
+
+    def link_to_filename(self, link: str) -> str:
+        """
+        Convert a given link into a zip filename, for more clarity of download
+        """
+        # Clean schema
+        link = link.removeprefix("http://").removeprefix("https://")
+        # Remove unnecessary prefix
+        link = link.removeprefix("www.")
+        # Remove extra slashes from the end
+        while link.endswith("/"):
+            link = link.removesuffix("/")
+        # Replace common web TLDs
+        link = link.replace(".com/", "_").replace(".co.uk/", "_").replace(".net", "_")
+        # Replace characters with underscores
+        link = link.replace(".", "_").replace("/", "_")
+        # Ensure no double underscores
+        while "__" in link:
+            link.replace("__", "_")
+        # Return that
         return link
