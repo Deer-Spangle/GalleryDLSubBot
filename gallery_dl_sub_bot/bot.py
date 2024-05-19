@@ -176,7 +176,8 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
-            await menu_msg.reply(f"Subscription created for {html.escape(link)}")
+            link_msg = await menu_msg.get_reply_message()
+            await link_msg.reply(f"Subscription created for {html.escape(link)}")
             await menu_msg.delete()
             raise events.StopPropagation
         # Handle other callback data
