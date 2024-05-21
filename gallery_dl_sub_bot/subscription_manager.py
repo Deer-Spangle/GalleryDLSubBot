@@ -70,6 +70,12 @@ class Subscription:
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
         )
 
+    def matching_dest(self, chat_id: int, user_id: int) -> Optional[SubscriptionDestination]:
+        for dest in self.destinations:
+            if dest.chat_id == chat_id and dest.creator_id == user_id:
+                return dest
+        return None
+
 
 class SubscriptionManager:
     CONFIG_FILE = "subscriptions.json"
@@ -196,3 +202,14 @@ class SubscriptionManager:
         if self.runner_task and not self.runner_task.done():
             loop.run_until_complete(self.runner_task)
         self.save()
+
+    def list_subscriptions(self, chat_id: int, user_id: int) -> list[Subscription]:
+        """Lists all the subscriptions matching a given destination and creator, ordered by creation date"""
+        sub_dest_pairs: list[tuple[Subscription, Optional[SubscriptionDestination]]] = [
+            (sub, sub.matching_dest(chat_id, user_id)) for sub in self.subscriptions[:]
+        ]
+        sorted_pairs: list[tuple[Subscription, SubscriptionDestination]] = sorted(
+            [pair for pair in sub_dest_pairs if pair[1] is not None],
+            key=lambda pair: pair[1].created_date,
+        )
+        return [pair[0] for pair in sorted_pairs]
