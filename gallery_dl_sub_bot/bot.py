@@ -12,12 +12,13 @@ from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
 from gallery_dl_sub_bot.link_fixer import LinkFixer
-from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
+from gallery_dl_sub_bot.subscription_manager import SubscriptionManager, Subscription
 
 logger = logging.getLogger(__name__)
 
 
 class Bot:
+    SUBS_PER_MENU_PAGE = 10
 
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -34,9 +35,11 @@ class Bot:
         # Register functions
         self.client.add_event_handler(self.start, events.NewMessage(pattern="/start", incoming=True))
         self.client.add_event_handler(self.boop, events.NewMessage(pattern="/beep", incoming=True))
+        self.client.add_event_handler(self.summon_subscription_menu, events.NewMessage(pattern="/subscriptions", incoming=True))
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
         self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
+        self.client.add_event_handler(self.page_subscriptions_menu, events.CallbackQuery(pattern="subs_offset:"))
         # Start listening
         try:
             # Start subscription manager
@@ -193,3 +196,82 @@ class Bot:
             raise events.StopPropagation
         # Handle other callback data
         await event.answer("Unrecognised response")
+
+    async def summon_subscription_menu(self, event: events.NewMessage.Event) -> None:
+        chat_id = event.chat.id
+        user_id = event.message.peer_id.user_id
+        subs = self.sub_manager.list_subscriptions(chat_id, user_id)
+        if len(subs) == 0:
+            await event.reply("You have no subscriptions in this chat. Send a link to create one")
+            raise events.StopPropagation
+        await event.reply(
+            self._subscription_menu_text(subs, 0),
+            parse_mode="html",
+            link_preview=False,
+            buttons=self._subscription_menu_buttons(subs, 0),
+        )
+        raise events.StopPropagation
+
+    def _subscription_menu_buttons(self, subs: list[Subscription], offset: int) -> list[list[Button]]:
+        # Cap offset
+        if offset < 0:
+            offset = 0
+        if offset >= len(subs):
+            offset = len(subs) - 1
+        # Get the page's subscription list
+        subs_page = subs[offset:offset+self.SUBS_PER_MENU_PAGE]
+        # Construct the pagination buttons
+        has_prev = offset > 0
+        has_next = len(subs) > self.SUBS_PER_MENU_PAGE + offset
+        pagination_row = []
+        if has_prev:
+            prev_offset = max(offset-self.SUBS_PER_MENU_PAGE, 0)
+            pagination_row.append(Button.inline("⬅️Prev", f"subs_offset:{prev_offset}"))
+        if has_next:
+            next_offset = offset + self.SUBS_PER_MENU_PAGE
+            pagination_row.append(Button.inline("➡️Next", f"subs_offset:{next_offset}"))
+        # Construct button list
+        return [
+                [Button.inline(f"{n}) {sub.link}", f"subs_menu:{n}")]
+                for n, sub in enumerate(subs_page, start=1+offset)
+            ] + [
+            pagination_row
+        ]
+
+    def _subscription_menu_text(self, subs: list[Subscription], offset: int) -> str:
+        menu_data = hidden_data({"offset": str(offset)})
+        menu_text = f"{menu_data}You have {len(subs)} subscriptions in this chat:\n"
+        lines = []
+        for n, sub in enumerate(subs, start=1):
+            bpt = "-"
+            idx = n - 1
+            if offset <= idx < offset + self.SUBS_PER_MENU_PAGE:
+                bpt = "*"
+            lines.append(f"{bpt} {n}) {html.escape(sub.link)}")
+        menu_text += "\n".join(lines)
+        return menu_text
+
+    async def page_subscriptions_menu(self, event: events.NewMessage.Event) -> None:
+        # Parse menu data
+        menu_msg = await event.get_message()
+        query_data = event.query.data
+        query_resp = query_data.removeprefix(b"subs_offset:")
+        offset = int(query_resp)
+        # Get subscription list
+        chat_id = event.chat.id
+        user_id = event.sender_id
+        subs = self.sub_manager.list_subscriptions(chat_id, user_id)
+        # Handle empty subscription list
+        if len(subs) == 0:
+            await menu_msg.edit("You have no subscriptions in this chat. Send a link to create one")
+            raise events.StopPropagation
+        # Send menu
+        await menu_msg.edit(
+            self._subscription_menu_text(subs, offset),
+            parse_mode="html",
+            link_preview=False,
+            buttons=self._subscription_menu_buttons(subs, offset),
+        )
+        raise events.StopPropagation
+
+
