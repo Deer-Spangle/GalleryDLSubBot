@@ -175,6 +175,10 @@ class Bot:
         dl_path = menu_data["path"]
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
+        # Check button is pressed by user who summoned the menu
+        if event.sender_id != user_id:
+            await event.answer("Unauthorized menu use")
+            raise events.StopPropagation
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
