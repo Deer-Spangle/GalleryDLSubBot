@@ -205,7 +205,7 @@ class Bot:
             await event.reply("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
         await event.reply(
-            self._subscription_menu_text(subs, 0),
+            self._subscription_menu_text(subs, 0, user_id),
             parse_mode="html",
             link_preview=False,
             buttons=self._subscription_menu_buttons(subs, 0),
@@ -238,8 +238,8 @@ class Bot:
             pagination_row
         ]
 
-    def _subscription_menu_text(self, subs: list[Subscription], offset: int) -> str:
-        menu_data = hidden_data({"offset": str(offset)})
+    def _subscription_menu_text(self, subs: list[Subscription], offset: int, user_id: int) -> str:
+        menu_data = hidden_data({"offset": str(offset), "user_id": str(user_id)})
         menu_text = f"{menu_data}You have {len(subs)} subscriptions in this chat:\n"
         lines = []
         for n, sub in enumerate(subs, start=1):
@@ -257,9 +257,13 @@ class Bot:
         query_data = event.query.data
         query_resp = query_data.removeprefix(b"subs_offset:")
         offset = int(query_resp)
+        # Check button is pressed by user who summoned the menu
+        user_id = int(menu_data["user_id"])
+        if event.sender_id != user_id:
+            await event.answer("Unauthorized menu use")
+            raise events.StopPropagation
         # Get subscription list
         chat_id = event.chat.id
-        user_id = event.sender_id
         subs = self.sub_manager.list_subscriptions(chat_id, user_id)
         # Handle empty subscription list
         if len(subs) == 0:
