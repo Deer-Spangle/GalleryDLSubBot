@@ -79,7 +79,7 @@ class Bot:
         if len(fixed_links) > 1:
             # Tell the user all the links
             lines = [f"- {html.escape(l)}" for l in fixed_links]
-            await event.reply("Found these links:\n" + "\n".join(lines), parse_mode="html")
+            await event.reply("Found these links:\n" + "\n".join(lines), parse_mode="html", link_preview=False)
         # Check them in gallery-dl
         await asyncio.gather(*(self._handle_link(link, event) for link in fixed_links))
         raise events.StopPropagation
@@ -87,7 +87,7 @@ class Bot:
     async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
         dl_path = f"store/downloads/{uuid.uuid4()}/"
         # TODO: If subscription exists, use that
-        evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html")
+        evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html", link_preview=False)
         try:
             # TODO: queueing
             # TODO: in progress message
@@ -121,7 +121,8 @@ class Bot:
                 buttons=[[
                     Button.inline("Yes, subscribe", "subscribe:yes"),
                     Button.inline("No thanks", "subscribe:no"),
-                ]]
+                ]],
+                link_preview=False,
             )
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
@@ -151,7 +152,12 @@ class Bot:
             zip_path = f"store/downloads/{zip_filename}"
             await aioshutil.make_archive(zip_path, "zip", dl_path)
             link_msg = await menu_msg.get_reply_message()
-            await link_msg.reply(f"Here is the zip archive of {html.escape(link)}", file=f"{zip_path}.zip")
+            await link_msg.reply(
+                f"Here is the zip archive of {html.escape(link)}",
+                file=f"{zip_path}.zip",
+                parse_mode="html",
+                link_preview=False,
+            )
             await menu_msg.delete()
             await aioshutil.rmtree(dl_path)
             os.unlink(f"{zip_path}.zip")
@@ -178,7 +184,7 @@ class Bot:
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
             link_msg = await menu_msg.get_reply_message()
-            await link_msg.reply(f"Subscription created for {html.escape(link)}")
+            await link_msg.reply(f"Subscription created for {html.escape(link)}", parse_mode="html", link_preview=False)
             await menu_msg.delete()
             raise events.StopPropagation
         # Handle other callback data
