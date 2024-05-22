@@ -167,7 +167,8 @@ class SubscriptionManager:
                 found_dest = dest
         if not found_dest:
             raise ValueError("Cannot find matching subscription for this link and chat")
-        found_dest.pause = pause
+        found_dest.paused = pause
+        self.save()
 
     def start(self) -> None:
         event_loop = asyncio.get_event_loop()
