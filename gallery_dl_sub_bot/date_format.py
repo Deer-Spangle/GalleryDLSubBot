@@ -1,6 +1,28 @@
 import datetime
 
 
+def _pluralise(num: int, noun: str) -> str:
+    if num == 1:
+        return f"{num} {noun}"
+    return f"{num} {noun}s"
+
+
+def _seconds(num: int) -> str:
+    return _pluralise(num, "second")
+
+
+def _minutes(num: int) -> str:
+    return _pluralise(num, "minute")
+
+
+def _hours(num: int) -> str:
+    return _pluralise(num, "hour")
+
+
+def _days(num: int) -> str:
+    return _pluralise(num, "day")
+
+
 def _format_time_since(date: datetime.datetime) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
     seconds_since = int((now - date).total_seconds())
@@ -12,28 +34,20 @@ def _format_time_since(date: datetime.datetime) -> str:
             return "In the future?"
         case (0, 0, 0, 0):
             return "Now"
-        case (0, 0, 0, 1):
-            return "1 second ago"
         case (0, 0, 0, seconds_since):
-            return f"{seconds_since} seconds ago"
-        case (0, 0, 1, seconds_since):
-            return f"1 minute, {seconds_since} seconds ago"
-        case (0, 0, 2, seconds_since):
-            return f"2 minutes, {seconds_since} seconds ago"
+            return f"{_seconds(seconds_since)} ago"
+        case (0, 0, 1 | 2 as minutes_since, seconds_since):
+            return f"{_minutes(minutes_since)}, {_seconds(seconds_since)} ago"
         case (0, 0, minutes_since, _):
-            return f"{minutes_since} minutes ago"
-        case (0, 1, minutes_since, _):
-            return f"1 hour, {minutes_since} minutes ago"
-        case (0, 2, minutes_since, _):
-            return f"2 hours, {minutes_since} minutes ago"
+            return f"{_minutes(minutes_since)} ago"
+        case (0, 1 | 2 as hours_since, minutes_since, _):
+            return f"{_hours(hours_since)}, {_minutes(minutes_since)} ago"
         case (0, hours_since, _, _):
-            return f"{hours_since} hours ago"
-        case (1, hours_since, _, _):
-            return f"1 day, {hours_since} hours ago"
-        case (2, hours_since, _, _):
-            return f"2 days, {hours_since} hours ago"
+            return f"{hours_since} ago"
+        case (1 | 2 as days_since, hours_since, _, _):
+            return f"{_days(days_since)}, {_hours(hours_since)} ago"
         case (days_since, _, _, _):
-            return f"{days_since} days ago"
+            return f"{_days(days_since)} ago"
 
 
 def _format_datetime(date: datetime.datetime) -> str:
