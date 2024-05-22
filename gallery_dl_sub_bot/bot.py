@@ -251,14 +251,16 @@ class Bot:
         menu_text += "\n".join(lines)
         return menu_text
 
-    async def page_subscriptions_menu(self, event: events.NewMessage.Event) -> None:
-        # Parse menu data
-        menu_msg = await event.get_message()
+    async def page_subscriptions_menu(self, event: events.CallbackQuery.Event) -> None:
+        # Parse callback data
         query_data = event.query.data
         query_resp = query_data.removeprefix(b"subs_offset:")
         offset = int(query_resp)
-        # Check button is pressed by user who summoned the menu
+        # Parse menu data
+        menu_msg = await event.get_message()
+        menu_data = parse_hidden_data(menu_msg)
         user_id = int(menu_data["user_id"])
+        # Check button is pressed by user who summoned the menu
         if event.sender_id != user_id:
             await event.answer("Unauthorized menu use")
             raise events.StopPropagation
@@ -271,7 +273,7 @@ class Bot:
             raise events.StopPropagation
         # Send menu
         await menu_msg.edit(
-            self._subscription_menu_text(subs, offset),
+            self._subscription_menu_text(subs, offset, user_id),
             parse_mode="html",
             link_preview=False,
             buttons=self._subscription_menu_buttons(subs, offset),
