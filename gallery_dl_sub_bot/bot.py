@@ -370,6 +370,12 @@ class Bot:
             await event.answer("Unauthorized menu use")
             raise events.StopPropagation
         # Unsubscribe
+        await menu_msg.edit(
+            f"⏳ Unsubscribing from {html.escape(link)}...",
+            parse_mode="html",
+            link_preview=False,
+            buttons=None,
+        )
         chat_id = event.chat.id
         await self.sub_manager.remove_subscription(link, chat_id)
         await menu_msg.edit(
