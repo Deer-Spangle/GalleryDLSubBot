@@ -340,13 +340,19 @@ class Bot:
         if sub.failed_checks > 0:
             view_sub_lines += [f"Failed last {sub.failed_checks} checks"]
             view_sub_lines += [f"Last successful check was: {format_last_check(sub.last_successful_check_date)}"]
+        pause_button = "Pause subscription"
+        pause_callback = "pause:pause"
+        if sub_dest.paused:
+            view_sub_lines += ["Subscription is paused."]
+            pause_button = "Resume subscription"
+            pause_callback = "pause:resume"
         await menu_msg.edit(
             "\n".join(view_sub_lines),
             parse_mode="html",
             link_preview=False,
             buttons=[
                 [Button.inline("Download zip", "dl_zip:yes")],
-                [Button.inline("Pause subscription", "pause:yes")],  # TODO
+                [Button.inline(pause_button, pause_callback)],
                 [Button.inline("Unsubscribe", "unsubscribe:yes")],
                 [Button.inline("⬅️Back to list", f"subs_offset:{offset}")]
             ],
@@ -387,5 +393,34 @@ class Bot:
         raise events.StopPropagation
 
     async def handle_pause_callback(self, event: events.CallbackQuery.Event) -> None:
-        await event.answer("Not yet supported.")
-        raise events.StopPropagation
+        # Parse callback data
+        query_data = event.query.data
+        query_resp = query_data.removeprefix(b"pause:")
+        # Parse menu data
+        menu_msg = await event.get_message()
+        menu_data = parse_hidden_data(menu_msg)
+        link = menu_data["link"]
+        user_id = int(menu_data["user_id"])
+        # Check button is pressed by user who summoned the menu
+        if event.sender_id != user_id:
+            await event.answer("Unauthorized menu use")
+            raise events.StopPropagation
+        # Check callback data
+        if query_resp == b"pause":
+            pause_sub = True
+        elif query_resp == b"resume":
+            pause_sub = False
+        else:
+            await event.answer("Unrecognised pause callback")
+            raise events.StopPropagation
+        # Pause subscription
+        chat_id = event.chat.id
+        await self.sub_manager.pause_subscription(link, chat_id, pause_sub)
+        # Refresh menu menu
+        pause_verb = "Paused" if pause_sub else "Resumed"
+        await menu_msg.edit(
+            f"{pause_verb} subscription to {html.escape(link)}",
+            parse_mode="html",
+            link_preview=False,
+            buttons=None,
+        )
