@@ -23,12 +23,14 @@ class SubscriptionDestination:
     chat_id: int
     creator_id: int
     created_date: datetime.datetime
+    paused: bool
 
     def to_json(self) -> dict:
         return {
             "chat_id": self.chat_id,
             "creator_id": self.creator_id,
             "created_date": self.created_date.isoformat(),
+            "paused": self.paused,
         }
 
     @classmethod
@@ -37,6 +39,7 @@ class SubscriptionDestination:
             data["chat_id"],
             data["creator_id"],
             datetime.datetime.fromisoformat(data["created_date"]),
+            data.get("paused", False),
         )
 
 
@@ -123,7 +126,8 @@ class SubscriptionManager:
         dest = SubscriptionDestination(
             chat_id,
             creator_id,
-            now_date
+            now_date,
+            False
         )
         # Extend or create subscription
         if matching_sub:
@@ -187,6 +191,8 @@ class SubscriptionManager:
                     file_handle = await self.client.upload_file(new_item)
                     # media = InputMediaUploadedPhoto(file_handle)
                     for dest in sub.destinations:
+                        if dest.paused:
+                            continue
                         await self.client.send_message(
                             entity=dest.chat_id,
                             file=file_handle,
