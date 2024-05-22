@@ -159,6 +159,16 @@ class SubscriptionManager:
             await aioshutil.rmtree(matching_sub.path)
         self.save()
 
+    async def pause_subscription(self, link: str, chat_id: int, pause: bool):
+        matching_sub = self.sub_for_link(link)
+        found_dest = None
+        for dest in matching_sub.destinations:
+            if dest.chat_id == chat_id:
+                found_dest = dest
+        if not found_dest:
+            raise ValueError("Cannot find matching subscription for this link and chat")
+        found_dest.pause = pause
+
     def start(self) -> None:
         event_loop = asyncio.get_event_loop()
         self.runner_task = event_loop.create_task(self.run())
