@@ -101,9 +101,10 @@ class SubscriptionManager:
         # current_files = matching_dl.list_files()
         # new_files = matching_dl.update(self.dl_manager)
 
-    async def delete_download(self, dl: CompleteDownload) -> None:
-        self.complete_downloads.remove(dl)
-        await aioshutil.rmtree(dl.path)
+    async def delete_download(self, dl: Download) -> None:
+        if isinstance(dl, CompleteDownload):
+            self.complete_downloads.remove(dl)
+            await aioshutil.rmtree(dl.path)
 
     async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_path: str) -> Subscription:
         # See if a subscription already exists for this link
