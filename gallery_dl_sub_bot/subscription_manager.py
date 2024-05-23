@@ -225,13 +225,13 @@ class SubscriptionManager:
             loop.run_until_complete(self.runner_task)
         self.save()
 
-    def list_subscriptions(self, chat_id: int, user_id: int) -> list[Subscription]:
+    def list_subscriptions(self, chat_id: int, user_id: int) -> list[SubscriptionDestination]:
         """Lists all the subscriptions matching a given destination and creator, ordered by creation date"""
-        sub_dest_pairs: list[tuple[Subscription, Optional[SubscriptionDestination]]] = [
-            (sub, sub.matching_dest(chat_id, user_id)) for sub in self.subscriptions[:]
+        sub_dests: list[Optional[SubscriptionDestination]] = [
+            sub.matching_dest(chat_id, user_id) for sub in self.subscriptions[:]
         ]
-        sorted_pairs: list[tuple[Subscription, SubscriptionDestination]] = sorted(
-            [pair for pair in sub_dest_pairs if pair[1] is not None],
-            key=lambda pair: pair[1].created_date,
-        )
-        return [pair[0] for pair in sorted_pairs]
+        non_null: list[SubscriptionDestination] = [
+            sd for sd in sub_dests if sd is not None
+        ]
+        sorted_sub_dests = sorted(non_null, key=lambda dest: dest.created_date)
+        return sorted_sub_dests

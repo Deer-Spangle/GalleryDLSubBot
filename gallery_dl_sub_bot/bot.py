@@ -13,7 +13,7 @@ from gallery_dl_sub_bot.date_format import format_last_check
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
 from gallery_dl_sub_bot.link_fixer import LinkFixer
-from gallery_dl_sub_bot.subscription_manager import SubscriptionManager, Subscription
+from gallery_dl_sub_bot.subscription_manager import SubscriptionManager, SubscriptionDestination
 
 logger = logging.getLogger(__name__)
 
@@ -204,19 +204,19 @@ class Bot:
     async def summon_subscription_menu(self, event: events.NewMessage.Event) -> None:
         chat_id = event.chat.id
         user_id = event.message.peer_id.user_id
-        subs = self.sub_manager.list_subscriptions(chat_id, user_id)
-        if len(subs) == 0:
+        sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
+        if len(sub_dests) == 0:
             await event.reply("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
         await event.reply(
-            self._list_subscriptions_menu_text(subs, 0, user_id),
+            self._list_subscriptions_menu_text(sub_dests, 0, user_id),
             parse_mode="html",
             link_preview=False,
-            buttons=self._list_subscriptions_menu_buttons(subs, 0),
+            buttons=self._list_subscriptions_menu_buttons(sub_dests, 0),
         )
         raise events.StopPropagation
 
-    def _list_subscriptions_menu_buttons(self, subs: list[Subscription], offset: int) -> list[list[Button]]:
+    def _list_subscriptions_menu_buttons(self, subs: list[SubscriptionDestination], offset: int) -> list[list[Button]]:
         # Cap offset
         if offset < 0:
             offset = 0
@@ -236,13 +236,13 @@ class Bot:
             pagination_row.append(Button.inline("➡️Next", f"subs_offset:{next_offset}"))
         # Construct button list
         return [
-                [Button.inline(f"{n}) {sub.link}", f"subs_menu:{n}")]
+                [Button.inline(f"{n}) {sub.subscription.link}", f"subs_menu:{n}")]
                 for n, sub in enumerate(subs_page, start=1+offset)
             ] + [
             pagination_row
         ]
 
-    def _list_subscriptions_menu_text(self, subs: list[Subscription], offset: int, user_id: int) -> str:
+    def _list_subscriptions_menu_text(self, subs: list[SubscriptionDestination], offset: int, user_id: int) -> str:
         menu_data = hidden_data({"offset": str(offset), "user_id": str(user_id)})
         menu_text = f"{menu_data}You have {len(subs)} subscriptions in this chat:\n"
         lines = []
@@ -252,6 +252,8 @@ class Bot:
             if offset <= idx < offset + self.SUBS_PER_MENU_PAGE:
                 bpt = "*"
             lines.append(f"{bpt} {n}) {html.escape(sub.link)}")
+            suffix = ""
+            lines.append(f"{bpt} {n}) {html.escape(sub.subscription.link)}{suffix}")
         menu_text += "\n".join(lines)
         return menu_text
 
@@ -270,17 +272,17 @@ class Bot:
             raise events.StopPropagation
         # Get subscription list
         chat_id = event.chat.id
-        subs = self.sub_manager.list_subscriptions(chat_id, user_id)
+        sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         # Handle empty subscription list
-        if len(subs) == 0:
+        if len(sub_dests) == 0:
             await menu_msg.edit("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
         # Send menu
         await menu_msg.edit(
-            self._list_subscriptions_menu_text(subs, offset, user_id),
+            self._list_subscriptions_menu_text(sub_dests, offset, user_id),
             parse_mode="html",
             link_preview=False,
-            buttons=self._list_subscriptions_menu_buttons(subs, offset),
+            buttons=self._list_subscriptions_menu_buttons(sub_dests, offset),
         )
         raise events.StopPropagation
 
@@ -300,34 +302,24 @@ class Bot:
             raise events.StopPropagation
         # Get subscription list
         chat_id = event.chat.id
-        subs = self.sub_manager.list_subscriptions(chat_id, user_id)
+        sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         # Handle empty subscription list
-        if len(subs) == 0:
+        if len(sub_dests) == 0:
             await menu_msg.edit("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
         # Check subscription index is valid
-        if 0 > view_sub_idx or len(subs) <= view_sub_idx:
+        if 0 > view_sub_idx or len(sub_dests) <= view_sub_idx:
             await event.answer("Subscription index not valid")
             await menu_msg.edit(
-                self._list_subscriptions_menu_text(subs, offset, user_id),
+                self._list_subscriptions_menu_text(sub_dests, offset, user_id),
                 parse_mode="html",
                 link_preview=False,
-                buttons=self._list_subscriptions_menu_buttons(subs, offset),
+                buttons=self._list_subscriptions_menu_buttons(sub_dests, offset),
             )
             raise events.StopPropagation
         # Get subscription and destination
-        sub = subs[view_sub_idx]
-        sub_dest = sub.matching_dest(chat_id, user_id)
-        # Ensure subscription destination exists. It should, but ensure it.
-        if sub_dest is None:
-            await event.answer("Subscription does not post to this chat?")
-            await menu_msg.edit(
-                self._list_subscriptions_menu_text(subs, offset, user_id),
-                parse_mode="html",
-                link_preview=False,
-                buttons=self._list_subscriptions_menu_buttons(subs, offset),
-            )
-            raise events.StopPropagation
+        sub_dest = sub_dests[view_sub_idx]
+        sub = sub_dest.subscription
         # Assemble menu data
         msg_data = {
             "path": sub.path,
