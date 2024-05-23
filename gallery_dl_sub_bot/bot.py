@@ -167,7 +167,8 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_filename = self.link_fixer.link_to_filename(link)
-            zip_path = f"store/downloads/{zip_filename}"
+            zip_dir = f"store/zips/{uuid.uuid4()}"
+            zip_path = f"{zip_dir}/{zip_filename}"
             await aioshutil.make_archive(zip_path, "zip", dl_path)
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(
@@ -177,7 +178,7 @@ class Bot:
                 link_preview=False,
             )
             await menu_msg.delete()
-            os.unlink(f"{zip_path}.zip")
+            await aioshutil.rmtree(zip_dir)
             raise events.StopPropagation
         # Handle other callback data
         await event.answer("Unrecognised response")
