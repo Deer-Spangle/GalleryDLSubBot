@@ -67,7 +67,7 @@ class Bot:
         if not self.auth_manager.user_is_trusted(event.message.peer_id.user_id):
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation
-        link_regex = re.compile(r"(https?://|www\.|\S+\.com)\S+", re.I)
+        link_regex = re.compile(r"(https?://|www\.|[^\s/]+\.com)[^\s'\"()[\]]+", re.I)
         links = []
         # Find links in text
         for link in link_regex.finditer(event.message.text):
