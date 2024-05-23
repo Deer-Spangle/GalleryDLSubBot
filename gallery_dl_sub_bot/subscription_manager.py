@@ -24,6 +24,7 @@ class SubscriptionDestination:
     creator_id: int
     created_date: datetime.datetime
     paused: bool
+    subscription: Optional["Subscription"] = None
 
     def to_json(self) -> dict:
         return {
@@ -51,6 +52,10 @@ class Subscription:
     last_check_date: datetime.datetime
     failed_checks: int
     last_successful_check_date: datetime.datetime
+
+    def __post_init__(self):
+        for dest in self.destinations:
+            dest.subscription = self
 
     def to_json(self) -> dict:
         return {
