@@ -1,9 +1,7 @@
 import asyncio
 import datetime
-import html
 import json
 import logging
-import os.path
 import uuid
 from asyncio import Task
 from typing import Optional
