@@ -125,7 +125,6 @@ class Bot:
             return
         # Otherwise post menus
         hidden_link = hidden_data({
-            "path": dl.path,
             "link": link,
             "user_id": str(event.message.peer_id.user_id),
         })
@@ -154,11 +153,15 @@ class Bot:
         menu_msg = await event.get_message()
         # Parse menu data
         menu_data = parse_hidden_data(menu_msg)
-        dl_path = menu_data["path"]
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
+        # Find the matching Download
+        dl = self.sub_manager.download_for_link(link)
+        if dl is None:
+            await menu_msg.edit("Error: This download seems to have disappeared", buttons=None)
+            raise events.StopPropagation
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
@@ -169,7 +172,7 @@ class Bot:
             zip_filename = self.link_fixer.link_to_filename(link)
             zip_dir = f"store/zips/{uuid.uuid4()}"
             zip_path = f"{zip_dir}/{zip_filename}"
-            await aioshutil.make_archive(zip_path, "zip", dl_path)
+            await aioshutil.make_archive(zip_path, "zip", dl.path)
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(
                 f"Here is the zip archive of {html.escape(link)}",
@@ -190,11 +193,15 @@ class Bot:
         menu_msg = await event.get_message()
         # Parse menu data
         menu_data = parse_hidden_data(menu_msg)
-        dl_path = menu_data["path"]
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
+        # Find matching Download
+        dl = self.sub_manager.download_for_link(link)
+        if dl is None:
+            await menu_msg.edit("Error: This download seems to have disappeared", buttons=None)
+            raise events.StopPropagation
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
@@ -340,7 +347,6 @@ class Bot:
         sub = sub_dest.subscription
         # Assemble menu data
         msg_data = {
-            "path": sub.path,
             "link": sub.link,
             "user_id": user_id,
         }
