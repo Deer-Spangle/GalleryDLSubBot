@@ -122,6 +122,12 @@ class SubscriptionManager:
                 return sub
         return None
 
+    def sub_for_link_and_chat(self, link: str, chat_id: int) -> Optional[SubscriptionDestination]:
+        matching_sub = self.sub_for_link(link)
+        if matching_sub is None:
+            return None
+        return matching_sub.matching_chat(chat_id)
+
     async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_path: str) -> Subscription:
         # See if a subscription already exists for this link
         matching_sub = self.sub_for_link(link)
@@ -160,13 +166,10 @@ class SubscriptionManager:
         return sub
 
     async def remove_subscription(self, link: str, chat_id: int) -> None:
-        matching_sub = self.sub_for_link(link)
-        found_dest = None
-        for dest in matching_sub.destinations:
-            if dest.chat_id == chat_id:
-                found_dest = dest
-        if not found_dest:
+        found_dest = self.sub_for_link_and_chat(link, chat_id)
+        if found_dest is None:
             raise ValueError("Cannot find matching subscription for this link and chat")
+        matching_sub = found_dest.subscription
         matching_sub.destinations.remove(found_dest)
         if len(matching_sub.destinations) == 0:
             self.subscriptions.remove(matching_sub)
@@ -174,12 +177,8 @@ class SubscriptionManager:
         self.save()
 
     async def pause_subscription(self, link: str, chat_id: int, pause: bool):
-        matching_sub = self.sub_for_link(link)
-        found_dest = None
-        for dest in matching_sub.destinations:
-            if dest.chat_id == chat_id:
-                found_dest = dest
-        if not found_dest:
+        found_dest = self.sub_for_link_and_chat(link, chat_id)
+        if found_dest is None:
             raise ValueError("Cannot find matching subscription for this link and chat")
         found_dest.paused = pause
         self.save()
