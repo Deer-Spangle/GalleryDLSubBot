@@ -18,6 +18,12 @@ from gallery_dl_sub_bot.subscription_manager import SubscriptionManager, Subscri
 logger = logging.getLogger(__name__)
 
 
+async def _check_sender(evt: events.CallbackQuery.Event, allowed_user_id: int) -> None:
+    if evt.sender_id != allowed_user_id:
+        await evt.answer("Unauthorized menu use")
+        raise events.StopPropagation
+
+
 class Bot:
     SUBS_PER_MENU_PAGE = 10
 
@@ -147,9 +153,7 @@ class Bot:
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
@@ -187,9 +191,7 @@ class Bot:
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
@@ -279,9 +281,7 @@ class Bot:
         menu_data = parse_hidden_data(menu_msg)
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Get subscription list
         chat_id = event.chat.id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
@@ -309,9 +309,7 @@ class Bot:
         offset = int(menu_data["offset"])
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Get subscription list
         chat_id = event.chat.id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
@@ -376,9 +374,7 @@ class Bot:
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Unsubscribe
         await menu_msg.edit(
             f"⏳ Unsubscribing from {html.escape(link)}...",
@@ -406,9 +402,7 @@ class Bot:
         link = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
-        if event.sender_id != user_id:
-            await event.answer("Unauthorized menu use")
-            raise events.StopPropagation
+        await _check_sender(event, user_id)
         # Check callback data
         if query_resp == b"pause":
             pause_sub = True
