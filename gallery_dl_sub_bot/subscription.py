@@ -1,7 +1,9 @@
 import dataclasses
 import datetime
+import html
 from typing import Optional
 
+from telethon import TelegramClient
 @dataclasses.dataclass
 class Download:
     link: str
@@ -96,3 +98,16 @@ class Subscription(Download):
             if dest.chat_id == chat_id and dest.creator_id == user_id:
                 return dest
         return None
+
+    async def send_new_items(self, new_items: list[str], client: TelegramClient):
+        for new_item in new_items:
+            file_handle = await client.upload_file(new_item)
+            for dest in self.destinations:
+                if dest.paused:
+                    continue
+                await client.send_message(
+                    entity=dest.chat_id,
+                    file=file_handle,
+                    message=f"Update on feed: {html.escape(self.link)}",
+                    parse_mode="html",
+                )

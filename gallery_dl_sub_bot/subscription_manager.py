@@ -168,18 +168,7 @@ class SubscriptionManager:
                 sub.last_check_date = now
                 sub.last_successful_check_date = now
                 # Send items to destinations
-                for new_item in new_items[::-1]:
-                    file_handle = await self.client.upload_file(new_item)
-                    # media = InputMediaUploadedPhoto(file_handle)
-                    for dest in sub.destinations:
-                        if dest.paused:
-                            continue
-                        await self.client.send_message(
-                            entity=dest.chat_id,
-                            file=file_handle,
-                            message=f"Update on feed: {html.escape(sub.link)}",
-                            parse_mode="html",
-                        )
+                await sub.send_new_items(new_items[::-1], self.client)
                 self.save()
             await asyncio.sleep(20)
 
