@@ -121,7 +121,7 @@ class Bot:
         # If less than 10 things, just post an album
         if len(lines) < 10:
             await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
-            # TODO: await aioshutil.rmtree(dl_path)
+            await self.sub_manager.delete_download(dl)
             return
         # Otherwise post menus
         hidden_link = hidden_data({
@@ -162,8 +162,6 @@ class Bot:
         # Handle no button
         if query_resp == b"no":
             await menu_msg.delete()
-            logger.info(f"Removing download path: {dl_path}")
-            await aioshutil.rmtree(dl_path)
             raise events.StopPropagation
         # Handle yes button
         if query_resp == b"yes":
@@ -179,7 +177,6 @@ class Bot:
                 link_preview=False,
             )
             await menu_msg.delete()
-            await aioshutil.rmtree(dl_path)
             os.unlink(f"{zip_path}.zip")
             raise events.StopPropagation
         # Handle other callback data
