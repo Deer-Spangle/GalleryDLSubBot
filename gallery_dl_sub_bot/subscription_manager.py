@@ -15,6 +15,7 @@ from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.subscription import (
     Subscription,
     SubscriptionDestination,
+    Download,
     CompleteDownload,
 )
 
@@ -42,6 +43,10 @@ class SubscriptionManager:
         self.running = False
         self.runner_task: Optional[Task] = None
 
+    @property
+    def all_downloads(self) -> list[Download]:
+        return self.subscriptions[:] + self.complete_downloads[:]  # TODO: + self.dl_in_progress[:]
+
     def save(self) -> None:
         config_data = {
             "subscriptions": [s.to_json() for s in self.subscriptions[:]],
@@ -49,6 +54,12 @@ class SubscriptionManager:
         }
         with open(self.CONFIG_FILE, "w") as f:
             json.dump(config_data, f, indent=2)
+
+    def download_for_link(self, link: str) -> Optional[Download]:
+        for download in self.all_downloads:
+            if download.link == link:
+                return download
+        return None
 
     def sub_for_link(self, link: str) -> Optional[Subscription]:
         for sub in self.subscriptions[:]:
@@ -62,10 +73,18 @@ class SubscriptionManager:
             return None
         return matching_sub.matching_chat(chat_id)
 
-    async def create_download(self, link: str) -> tuple[CompleteDownload, list[str]]:
-        # TODO: return a CompleteDownload object
-        # TODO: See if a download already exists for this link
-        # matching_dl = self.download_for_link(link)
+    async def create_download(self, link: str) -> tuple[Download, list[str]]:
+        # See if a download already exists for this link
+        matching_dl = self.download_for_link(link)
+        if matching_dl:
+            dl_path = matching_dl.path
+            existing_files = matching_dl.list_files()
+            new_lines = await self.dl_manager.download(link, dl_path)
+            await matching_dl.send_new_items(new_lines[::-1], self.client)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            matching_dl.last_check_date = now
+            self.save()
+            return matching_dl, existing_files + new_lines[::-1]
         dl_path = f"store/downloads/{uuid.uuid4()}/"
         # TODO: queueing
         # TODO: in progress message
@@ -77,6 +96,7 @@ class SubscriptionManager:
             now,
         )
         self.complete_downloads.append(dl)
+        self.save()
         return dl, lines
         # current_files = matching_dl.list_files()
         # new_files = matching_dl.update(self.dl_manager)

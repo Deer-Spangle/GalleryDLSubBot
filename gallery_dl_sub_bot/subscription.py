@@ -1,14 +1,25 @@
 import dataclasses
 import datetime
+import glob
 import html
 from typing import Optional
 
 from telethon import TelegramClient
+
+
 @dataclasses.dataclass
 class Download:
     link: str
     path: str
     last_check_date: datetime.datetime
+
+    def list_files(self) -> list[str]:
+        all_files = glob.glob(self.path + '/**/*.*', recursive=True)
+        img_files = [f for f in all_files if not (f.endswith(".json") or f.endswith(".sqlite"))]
+        return sorted(img_files)
+
+    async def send_new_items(self, new_items: list[str], client: TelegramClient) -> None:
+        pass
 
 
 @dataclasses.dataclass
@@ -99,7 +110,7 @@ class Subscription(Download):
                 return dest
         return None
 
-    async def send_new_items(self, new_items: list[str], client: TelegramClient):
+    async def send_new_items(self, new_items: list[str], client: TelegramClient) -> None:
         for new_item in new_items:
             file_handle = await client.upload_file(new_item)
             for dest in self.destinations:
