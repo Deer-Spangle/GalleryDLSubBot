@@ -59,7 +59,7 @@ class SubscriptionManager:
         # See if a subscription already exists for this link
         matching_sub = self.sub_for_link(link)
         # See if that subscription already exists in this chat
-        if matching_sub.matching_chat(chat_id):
+        if matching_sub and matching_sub.matching_chat(chat_id):
             raise ValueError("Subscription already exists in this chat for this link")
         # Figure out new path
         new_path = f"store/subscriptions/{uuid.uuid4()}"
