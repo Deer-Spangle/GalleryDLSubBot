@@ -108,45 +108,44 @@ class Bot:
         raise events.StopPropagation
 
     async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
-        dl_path = f"store/downloads/{uuid.uuid4()}/"
-        # TODO: If subscription exists, use that
         evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html", link_preview=False)
         try:
-            # TODO: queueing
-            # TODO: in progress message
-            lines = await self.dl_manager.download(link, dl_path)
+            dl, lines = await self.sub_manager.create_download(link)
         except Exception as e:
             logger.error(f"Failed to download link {link}", exc_info=e)
             await evt.reply(f"Failed to download link {html.escape(link)} :(")
             raise e
+        # Post update on feed size
         await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
         await evt.delete()
+        # If less than 10 things, just post an album
         if len(lines) < 10:
             await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
-            await aioshutil.rmtree(dl_path)
-        else:
-            hidden_link = hidden_data({
-                "path": dl_path,
-                "link": link,
-                "user_id": str(event.message.peer_id.user_id),
-            })
-            await event.reply(
-                f"Would you like to download these files as a zip?{hidden_link}",
-                parse_mode="html",
-                buttons=[[
-                    Button.inline("Yes", "dl_zip:yes"),
-                    Button.inline("No thanks", "dl_zip:no"),
-                ]]
-            )
-            await event.reply(
-                f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
-                parse_mode="html",
-                buttons=[[
-                    Button.inline("Yes, subscribe", "subscribe:yes"),
-                    Button.inline("No thanks", "subscribe:no"),
-                ]],
-                link_preview=False,
-            )
+            # TODO: await aioshutil.rmtree(dl_path)
+            return
+        # Otherwise post menus
+        hidden_link = hidden_data({
+            "path": dl.path,
+            "link": link,
+            "user_id": str(event.message.peer_id.user_id),
+        })
+        await event.reply(
+            f"Would you like to download these files as a zip?{hidden_link}",
+            parse_mode="html",
+            buttons=[[
+                Button.inline("Yes", "dl_zip:yes"),
+                Button.inline("No thanks", "dl_zip:no"),
+            ]]
+        )
+        await event.reply(
+            f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
+            parse_mode="html",
+            buttons=[[
+                Button.inline("Yes, subscribe", "subscribe:yes"),
+                Button.inline("No thanks", "subscribe:no"),
+            ]],
+            link_preview=False,
+        )
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
         query_data = event.query.data

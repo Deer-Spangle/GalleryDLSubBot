@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import datetime
 import html
 import json
@@ -13,7 +12,11 @@ import aioshutil
 from telethon import TelegramClient
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
-from gallery_dl_sub_bot.subscription import Subscription, SubscriptionDestination
+from gallery_dl_sub_bot.subscription import (
+    Subscription,
+    SubscriptionDestination,
+    CompleteDownload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +36,16 @@ class SubscriptionManager:
         self.subscriptions = [
             Subscription.from_json(sub_data) for sub_data in config_data.get("subscriptions", [])
         ]
+        self.complete_downloads = [
+            CompleteDownload.from_json(dl_data) for dl_data in config_data.get("downloads", [])
+        ]
         self.running = False
         self.runner_task: Optional[Task] = None
 
     def save(self) -> None:
         config_data = {
-            "subscriptions": [s.to_json() for s in self.subscriptions[:]]
+            "subscriptions": [s.to_json() for s in self.subscriptions[:]],
+            "complete_downloads": [dl.to_json() for dl in self.complete_downloads[:]],
         }
         with open(self.CONFIG_FILE, "w") as f:
             json.dump(config_data, f, indent=2)
@@ -54,6 +61,25 @@ class SubscriptionManager:
         if matching_sub is None:
             return None
         return matching_sub.matching_chat(chat_id)
+
+    async def create_download(self, link: str) -> tuple[CompleteDownload, list[str]]:
+        # TODO: return a CompleteDownload object
+        # TODO: See if a download already exists for this link
+        # matching_dl = self.download_for_link(link)
+        dl_path = f"store/downloads/{uuid.uuid4()}/"
+        # TODO: queueing
+        # TODO: in progress message
+        lines = await self.dl_manager.download(link, dl_path)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        dl = CompleteDownload(
+            link,
+            dl_path,
+            now,
+        )
+        self.complete_downloads.append(dl)
+        return dl, lines
+        # current_files = matching_dl.list_files()
+        # new_files = matching_dl.update(self.dl_manager)
 
     async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_path: str) -> Subscription:
         # See if a subscription already exists for this link
