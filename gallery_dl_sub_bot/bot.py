@@ -251,8 +251,11 @@ class Bot:
             idx = n - 1
             if offset <= idx < offset + self.SUBS_PER_MENU_PAGE:
                 bpt = "*"
-            lines.append(f"{bpt} {n}) {html.escape(sub.link)}")
             suffix = ""
+            if sub.subscription.failed_checks > 0:
+                suffix = " (failing checks)"
+            if sub.paused:
+                suffix = " (paused)"
             lines.append(f"{bpt} {n}) {html.escape(sub.subscription.link)}{suffix}")
         menu_text += "\n".join(lines)
         return menu_text
