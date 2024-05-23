@@ -2,6 +2,31 @@ import dataclasses
 import datetime
 from typing import Optional
 
+@dataclasses.dataclass
+class Download:
+    link: str
+    path: str
+    last_check_date: datetime.datetime
+
+
+@dataclasses.dataclass
+class CompleteDownload(Download):
+
+    def to_json(self) -> dict:
+        return {
+            "link": self.link,
+            "path": self.path,
+            "last_check_date": self.last_check_date.isoformat(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict) -> "CompleteDownload":
+        return cls(
+            data["link"],
+            data["path"],
+            datetime.datetime.fromisoformat(data["last_check_date"]),
+        )
+
 
 @dataclasses.dataclass
 class SubscriptionDestination:
@@ -30,11 +55,8 @@ class SubscriptionDestination:
 
 
 @dataclasses.dataclass
-class Subscription:
-    link: str
-    path: str
+class Subscription(Download):
     destinations: list[SubscriptionDestination]
-    last_check_date: datetime.datetime
     failed_checks: int
     last_successful_check_date: datetime.datetime
 
@@ -46,8 +68,8 @@ class Subscription:
         return {
             "link": self.link,
             "path": self.path,
-            "destinations": [d.to_json() for d in self.destinations],
             "last_check_date": self.last_check_date.isoformat(),
+            "destinations": [d.to_json() for d in self.destinations],
             "failed_checks": self.failed_checks,
             "last_successful_check_date": self.last_successful_check_date.isoformat(),
         }
@@ -57,8 +79,8 @@ class Subscription:
         return cls(
             data["link"],
             data["path"],
-            [SubscriptionDestination.from_json(d) for d in data["destinations"]],
             datetime.datetime.fromisoformat(data["last_check_date"]),
+            [SubscriptionDestination.from_json(d) for d in data["destinations"]],
             data["failed_checks"],
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
         )

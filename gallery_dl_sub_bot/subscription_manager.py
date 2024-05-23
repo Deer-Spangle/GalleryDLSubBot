@@ -83,8 +83,8 @@ class SubscriptionManager:
         sub = Subscription(
             link,
             new_path,
-            [dest],
             now_date,
+            [dest],
             0,
             now_date,
         )
