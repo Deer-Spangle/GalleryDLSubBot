@@ -193,7 +193,12 @@ class Bot:
         # Handle yes button press
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
-            await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
+            try:
+                await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
+            except Exception as e:
+                logger.error(f"Failed to subscribe to {link}", exc_info=e)
+                await menu_msg.edit(f"Failed to create subscription to {html.escape(link)}", parse_mode="html", link_preview=False)
+                raise e
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(f"Subscription created for {html.escape(link)}", parse_mode="html", link_preview=False)
             await menu_msg.delete()

@@ -78,6 +78,12 @@ class Subscription:
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
         )
 
+    def matching_chat(self, chat_id: int) -> Optional[SubscriptionDestination]:
+        for dest in self.destinations:
+            if dest.chat_id == chat_id:
+                return dest
+        return None
+
     def matching_dest(self, chat_id: int, user_id: int) -> Optional[SubscriptionDestination]:
         for dest in self.destinations:
             if dest.chat_id == chat_id and dest.creator_id == user_id:
@@ -119,6 +125,9 @@ class SubscriptionManager:
     async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_path: str) -> Subscription:
         # See if a subscription already exists for this link
         matching_sub = self.sub_for_link(link)
+        # See if that subscription already exists in this chat
+        if matching_sub.matching_chat(chat_id):
+            raise ValueError("Subscription already exists in this chat for this link")
         # Figure out new path
         new_path = f"store/subscriptions/{uuid.uuid4()}"
         if matching_sub:
