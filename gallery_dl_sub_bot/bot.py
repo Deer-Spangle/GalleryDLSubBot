@@ -82,9 +82,13 @@ class Bot:
             await event.reply("Could not find any links in that message")
             raise events.StopPropagation
         # Fix all the links
-        fixed_links = [self.link_fixer.fix_link(l) for l in links]  # TODO remove duplicates
+        fixed_links = []
+        for l in links:
+            fixed_link = self.link_fixer.fix_link(l)
+            if fixed_link not in fixed_links:
+                fixed_links.append(fixed_link)
+        # Tell the user all the links
         if len(fixed_links) > 1:
-            # Tell the user all the links
             lines = [f"- {html.escape(l)}" for l in fixed_links]
             await event.reply("Found these links:\n" + "\n".join(lines), parse_mode="html", link_preview=False)
         # Check them in gallery-dl
