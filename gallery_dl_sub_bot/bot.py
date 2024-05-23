@@ -210,7 +210,7 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             try:
-                await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
+                await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl)
             except Exception as e:
                 logger.error(f"Failed to subscribe to {link}", exc_info=e)
                 await menu_msg.edit(

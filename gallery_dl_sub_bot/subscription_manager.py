@@ -104,19 +104,7 @@ class SubscriptionManager:
             self.complete_downloads.remove(dl)
             await aioshutil.rmtree(dl.path)
 
-    async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_path: str) -> Subscription:
-        # See if a subscription already exists for this link
-        matching_sub = self.sub_for_link(link)
-        # See if that subscription already exists in this chat
-        if matching_sub and matching_sub.matching_chat(chat_id):
-            raise ValueError("Subscription already exists in this chat for this link")
-        # Figure out new path
-        new_path = f"store/subscriptions/{uuid.uuid4()}"
-        if matching_sub:
-            new_path = matching_sub.path
-        # Copy files
-        if not matching_sub and os.path.exists(current_path):
-            await aioshutil.copytree(current_path, new_path)
+    async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_dl: Download) -> Subscription:
         # Create destination
         now_date = datetime.datetime.now(datetime.timezone.utc)
         dest = SubscriptionDestination(
@@ -125,10 +113,23 @@ class SubscriptionManager:
             now_date,
             False
         )
-        # Extend or create subscription
-        if matching_sub:
-            matching_sub.destinations.append(dest)
-            return matching_sub
+        # If current download is a subscription, just add a new destination
+        if isinstance(current_dl, Subscription):
+            # See if that subscription already exists in this chat
+            if current_dl.matching_chat(chat_id):
+                raise ValueError("Subscription already exists in this chat for this link")
+            # Extend existing subscription
+            current_dl.destinations.append(dest)
+            self.save()
+            return current_dl
+        # If not a CompleteDownload, raise exception
+        if not isinstance(current_dl, CompleteDownload):
+            raise ValueError("Download is not complete")  # TODO: wait for complete
+        # Figure out new path
+        new_path = f"store/subscriptions/{uuid.uuid4()}"
+        # Copy files to new path
+        await aioshutil.copytree(current_dl.path, new_path)
+        # Otherwise create new subscription
         sub = Subscription(
             link,
             new_path,
@@ -137,7 +138,10 @@ class SubscriptionManager:
             0,
             now_date,
         )
+        # Add new subscription, remove download
         self.subscriptions.append(sub)
+        # Delete download
+        await self.delete_download(current_dl)
         self.save()
         return sub
 
