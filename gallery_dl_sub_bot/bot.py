@@ -213,6 +213,7 @@ class Bot:
                     f"Failed to create subscription to {html.escape(link)}",
                     parse_mode="html",
                     link_preview=False,
+                    buttons=None,
                 )
                 raise e
             link_msg = await menu_msg.get_reply_message()
