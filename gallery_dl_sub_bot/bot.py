@@ -42,7 +42,10 @@ class Bot:
         # Register functions
         self.client.add_event_handler(self.start, events.NewMessage(pattern="/start", incoming=True))
         self.client.add_event_handler(self.boop, events.NewMessage(pattern="/beep", incoming=True))
-        self.client.add_event_handler(self.summon_subscription_menu, events.NewMessage(pattern="/subscriptions", incoming=True))
+        self.client.add_event_handler(
+            self.summon_subscription_menu,
+            events.NewMessage(pattern="/subscriptions", incoming=True),
+        )
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
         self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
@@ -61,10 +64,12 @@ class Bot:
             self.sub_manager.stop()
             logger.info("Bot sleepy bye-bye time")
 
+    # noinspection PyMethodMayBeStatic
     async def boop(self, event: events.NewMessage.Event) -> None:
         await event.reply("Boop!")
         raise events.StopPropagation
 
+    # noinspection PyMethodMayBeStatic
     async def start(self, event: events.NewMessage.Event) -> None:
         await event.reply("Hey there! I'm not a very good bot yet, I'm quite early in development.")
         raise events.StopPropagation
@@ -89,13 +94,13 @@ class Bot:
             raise events.StopPropagation
         # Fix all the links
         fixed_links = []
-        for l in links:
-            fixed_link = self.link_fixer.fix_link(l)
+        for link in links:
+            fixed_link = self.link_fixer.fix_link(link)
             if fixed_link not in fixed_links:
                 fixed_links.append(fixed_link)
         # Tell the user all the links
         if len(fixed_links) > 1:
-            lines = [f"- {html.escape(l)}" for l in fixed_links]
+            lines = [f"- {html.escape(link)}" for link in fixed_links]
             await event.reply("Found these links:\n" + "\n".join(lines), parse_mode="html", link_preview=False)
         # Check them in gallery-dl
         await asyncio.gather(*(self._handle_link(link, event) for link in fixed_links))
@@ -203,7 +208,11 @@ class Bot:
                 await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl_path)
             except Exception as e:
                 logger.error(f"Failed to subscribe to {link}", exc_info=e)
-                await menu_msg.edit(f"Failed to create subscription to {html.escape(link)}", parse_mode="html", link_preview=False)
+                await menu_msg.edit(
+                    f"Failed to create subscription to {html.escape(link)}",
+                    parse_mode="html",
+                    link_preview=False,
+                )
                 raise e
             link_msg = await menu_msg.get_reply_message()
             await link_msg.reply(f"Subscription created for {html.escape(link)}", parse_mode="html", link_preview=False)
