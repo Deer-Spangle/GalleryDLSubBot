@@ -4,7 +4,8 @@ import json
 import logging
 import uuid
 from asyncio import Task
-from typing import Optional
+from contextlib import asynccontextmanager
+from typing import Optional, AsyncIterator
 
 import aioshutil
 from telethon import TelegramClient
@@ -212,3 +213,14 @@ class SubscriptionManager:
         ]
         sorted_sub_dests = sorted(non_null, key=lambda dest: dest.created_date)
         return sorted_sub_dests
+
+    @asynccontextmanager
+    async def create_zip(self, dl: Download, filename: str) -> AsyncIterator[str]:
+        zip_dir = f"store/zips/{uuid.uuid4()}"
+        zip_path = f"{zip_dir}/{filename}"
+        async with dl.zip_lock:
+            try:
+                await aioshutil.make_archive(zip_path, "zip", dl.path)
+                yield f"{zip_path}.zip"
+            finally:
+                await aioshutil.rmtree(zip_dir)

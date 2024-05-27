@@ -170,18 +170,15 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_filename = self.link_fixer.link_to_filename(link)
-            zip_dir = f"store/zips/{uuid.uuid4()}"
-            zip_path = f"{zip_dir}/{zip_filename}"
-            await aioshutil.make_archive(zip_path, "zip", dl.path)
-            link_msg = await menu_msg.get_reply_message()
-            await link_msg.reply(
-                f"Here is the zip archive of {html.escape(link)}",
-                file=f"{zip_path}.zip",
-                parse_mode="html",
-                link_preview=False,
-            )
-            await menu_msg.delete()
-            await aioshutil.rmtree(zip_dir)
+            async with self.sub_manager.create_zip(dl, zip_filename) as zip_file:
+                link_msg = await menu_msg.get_reply_message()
+                await link_msg.reply(
+                    f"Here is the zip archive of {html.escape(link)}",
+                    file=zip_file,
+                    parse_mode="html",
+                    link_preview=False,
+                )
+                await menu_msg.delete()
             raise events.StopPropagation
         # Handle other callback data
         await event.answer("Unrecognised response")

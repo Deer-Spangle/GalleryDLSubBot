@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 import datetime
 import glob
@@ -12,6 +13,7 @@ class Download:
     link: str
     path: str
     last_check_date: datetime.datetime
+    zip_lock: asyncio.Lock = dataclasses.field(default_factory=lambda: asyncio.Lock(), kw_only=True)
 
     def list_files(self) -> list[str]:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
