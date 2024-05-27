@@ -103,7 +103,8 @@ class SubscriptionManager:
     async def delete_download(self, dl: Download) -> None:
         if isinstance(dl, CompleteDownload):
             self.complete_downloads.remove(dl)
-            await aioshutil.rmtree(dl.path)
+            async with dl.zip_lock:
+                await aioshutil.rmtree(dl.path)
 
     async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_dl: Download) -> Subscription:
         # Create destination
@@ -154,7 +155,8 @@ class SubscriptionManager:
         matching_sub.destinations.remove(found_dest)
         if len(matching_sub.destinations) == 0:
             self.subscriptions.remove(matching_sub)
-            await aioshutil.rmtree(matching_sub.path)
+            async with matching_sub.zip_lock:
+                await aioshutil.rmtree(matching_sub.path)
         self.save()
 
     async def pause_subscription(self, link: str, chat_id: int, pause: bool):
