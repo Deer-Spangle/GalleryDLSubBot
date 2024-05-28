@@ -44,7 +44,7 @@ class SubscriptionManager:
 
     @property
     def all_downloads(self) -> list[Download]:
-        return self.subscriptions[:] + self.complete_downloads[:]  # TODO: + self.dl_in_progress[:]
+        return self.subscriptions[:] + self.complete_downloads[:]
 
     def save(self) -> None:
         config_data = {
