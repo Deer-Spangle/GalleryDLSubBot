@@ -34,10 +34,10 @@ class SubscriptionManager:
         except FileNotFoundError:
             config_data = {}
         self.subscriptions = [
-            Subscription.from_json(sub_data) for sub_data in config_data.get("subscriptions", [])
+            Subscription.from_json(sub_data, dl_manager) for sub_data in config_data.get("subscriptions", [])
         ]
         self.complete_downloads = [
-            CompleteDownload.from_json(dl_data) for dl_data in config_data.get("downloads", [])
+            CompleteDownload.from_json(dl_data, dl_manager) for dl_data in config_data.get("downloads", [])
         ]
         self.running = False
         self.runner_task: Optional[Task] = None
@@ -93,6 +93,7 @@ class SubscriptionManager:
             link,
             dl_path,
             now,
+            self.dl_manager,
         )
         self.complete_downloads.append(dl)
         self.save()
@@ -136,6 +137,7 @@ class SubscriptionManager:
             link,
             new_path,
             now_date,
+            self.dl_manager,
             [dest],
             0,
             now_date,

@@ -7,14 +7,22 @@ from typing import Optional
 
 from telethon import TelegramClient
 
+from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 
 
 class Download:
 
-    def __init__(self, link: str, path: str, last_check_date: datetime.datetime) -> None:
+    def __init__(
+            self,
+            link: str,
+            path: str,
+            last_check_date: datetime.datetime,
+            dl_manager: GalleryDLManager,
+    ) -> None:
         self.link = link
         self.path = path
         self.last_check_date = last_check_date
+        self.dl_manager = dl_manager
         self.zip_lock = asyncio.Lock()
 
     def list_files(self) -> list[str]:
@@ -23,6 +31,10 @@ class Download:
         return sorted(img_files)
 
     async def send_new_items(self, new_items: list[str], client: TelegramClient) -> None:
+        pass
+
+
+    async def iter_lines(self) -> AsyncIterator[str]:
         pass
 
 
@@ -36,11 +48,12 @@ class CompleteDownload(Download):
         }
 
     @classmethod
-    def from_json(cls, data: dict) -> "CompleteDownload":
+    def from_json(cls, data: dict, dl_manager: GalleryDLManager) -> "CompleteDownload":
         return cls(
             data["link"],
             data["path"],
             datetime.datetime.fromisoformat(data["last_check_date"]),
+            dl_manager,
         )
 
 
@@ -77,11 +90,12 @@ class Subscription(Download):
             link: str,
             path: str,
             last_check_date: datetime.datetime,
+            dl_manager: GalleryDLManager,
             destinations: list[SubscriptionDestination],
             failed_checks: int,
             last_successful_check_date: datetime.datetime,
     ) -> None:
-        super().__init__(link, path, last_check_date)
+        super().__init__(link, path, last_check_date, dl_manager)
         self.destinations = destinations
         self.failed_checks = failed_checks
         self.last_successful_check_date = last_successful_check_date
@@ -101,11 +115,12 @@ class Subscription(Download):
         }
 
     @classmethod
-    def from_json(cls, data: dict) -> "Subscription":
+    def from_json(cls, data: dict, dl_manager: GalleryDLManager) -> "Subscription":
         return cls(
             data["link"],
             data["path"],
             datetime.datetime.fromisoformat(data["last_check_date"]),
+            dl_manager,
             [SubscriptionDestination.from_json(d) for d in data["destinations"]],
             data["failed_checks"],
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
