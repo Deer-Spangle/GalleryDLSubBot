@@ -30,7 +30,7 @@ class Download:
         img_files = [f for f in all_files if not (f.endswith(".json") or f.endswith(".sqlite"))]
         return sorted(img_files)
 
-    async def send_new_items(self, new_items: list[str], client: TelegramClient) -> None:
+    async def send_new_items(self, new_items: list[str]) -> None:
         pass
 
 
@@ -94,11 +94,13 @@ class Subscription(Download):
             destinations: list[SubscriptionDestination],
             failed_checks: int,
             last_successful_check_date: datetime.datetime,
+            client: TelegramClient,
     ) -> None:
         super().__init__(link, path, last_check_date, dl_manager)
         self.destinations = destinations
         self.failed_checks = failed_checks
         self.last_successful_check_date = last_successful_check_date
+        self.client = client
 
     def __post_init__(self):
         for dest in self.destinations:
@@ -115,7 +117,7 @@ class Subscription(Download):
         }
 
     @classmethod
-    def from_json(cls, data: dict, dl_manager: GalleryDLManager) -> "Subscription":
+    def from_json(cls, data: dict, dl_manager: GalleryDLManager, client: TelegramClient) -> "Subscription":
         return cls(
             data["link"],
             data["path"],
@@ -124,6 +126,7 @@ class Subscription(Download):
             [SubscriptionDestination.from_json(d) for d in data["destinations"]],
             data["failed_checks"],
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
+            client,
         )
 
     def matching_chat(self, chat_id: int) -> Optional[SubscriptionDestination]:
@@ -138,13 +141,13 @@ class Subscription(Download):
                 return dest
         return None
 
-    async def send_new_items(self, new_items: list[str], client: TelegramClient) -> None:
+    async def send_new_items(self, new_items: list[str]) -> None:
         for new_item in new_items:
-            file_handle = await client.upload_file(new_item)
+            file_handle = await self.client.upload_file(new_item)
             for dest in self.destinations:
                 if dest.paused:
                     continue
-                await client.send_message(
+                await self.client.send_message(
                     entity=dest.chat_id,
                     file=file_handle,
                     message=f"Update on feed: {html.escape(self.link)}",

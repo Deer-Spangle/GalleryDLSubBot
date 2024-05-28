@@ -34,7 +34,7 @@ class SubscriptionManager:
         except FileNotFoundError:
             config_data = {}
         self.subscriptions = [
-            Subscription.from_json(sub_data, dl_manager) for sub_data in config_data.get("subscriptions", [])
+            Subscription.from_json(sub_data, dl_manager, client) for sub_data in config_data.get("subscriptions", [])
         ]
         self.complete_downloads = [
             CompleteDownload.from_json(dl_data, dl_manager) for dl_data in config_data.get("downloads", [])
@@ -79,7 +79,7 @@ class SubscriptionManager:
             dl_path = matching_dl.path
             existing_files = matching_dl.list_files()
             new_lines = await self.dl_manager.download(link, dl_path)
-            await matching_dl.send_new_items(new_lines[::-1], self.client)
+            await matching_dl.send_new_items(new_lines[::-1])
             now = datetime.datetime.now(datetime.timezone.utc)
             matching_dl.last_check_date = now
             self.save()
@@ -141,6 +141,7 @@ class SubscriptionManager:
             [dest],
             0,
             now_date,
+            self.client,
         )
         # Add new subscription, remove download
         self.subscriptions.append(sub)
@@ -196,7 +197,7 @@ class SubscriptionManager:
                 sub.last_check_date = now
                 sub.last_successful_check_date = now
                 # Send items to destinations
-                await sub.send_new_items(new_items[::-1], self.client)
+                await sub.send_new_items(new_items[::-1])
                 self.save()
             await asyncio.sleep(20)
 
