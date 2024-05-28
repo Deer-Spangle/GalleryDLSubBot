@@ -1,9 +1,9 @@
 import datetime
 import logging
 import pathlib
-from typing import Optional
+from typing import Optional, AsyncIterator
 
-from gallery_dl_sub_bot.run_cmd import run_cmd
+from gallery_dl_sub_bot.run_cmd import run_cmd, run_cmd_iter
 
 logger = logging.getLogger(__name__)
 
@@ -21,25 +21,42 @@ class GalleryDLManager:
     def update_needed(self) -> bool:
         return self.last_update is None
 
-    async def run(self, args: list[str]) -> str:
+    async def check_update(self) -> None:
         if self.update_needed():
             await self.update_tool()
-        if self.config_path:
-            args = ["-c", self.config_path, *args]
+
+    async def run(self, args: list[str]) -> str:
+        await self.check_update()
         resp = await run_cmd(["gallery-dl", *args])
         return resp
 
-    async def download(self, link: str, dl_path: str) -> list[str]:
+    async def run_iter(self, args: list[str]) -> AsyncIterator[str]:
+        await self.check_update()
+        async for line in run_cmd_iter(["gallery-dl", *args]):
+            yield line
+
+    def dl_args(self, link: str, dl_path: str) -> list[str]:
         archive_path = pathlib.Path(dl_path) / "archive.sqlite"
-        resp = await self.run([
+        args = []
+        if self.config_path:
+            args += ["-c", self.config_path]
+        args += [
             "--write-metadata",
             "--write-info-json",
             "-o", "output.skip=false",
             "-d", dl_path,
             "--download-archive", str(archive_path),
             link,
-        ])
+        ]
+        return args
+
+    async def download(self, link: str, dl_path: str) -> list[str]:
+        resp = await self.run(self.dl_args(link, dl_path))  # TODO: Queueing
         resp_clean = resp.strip()
         if not resp_clean:
             return []
         return resp_clean.split("\n")
+
+    def download_iter(self, link: str, dl_path: str) -> AsyncIterator[str]:
+        run_iterator = self.run_iter(self.dl_args(link, dl_path))
+        return run_iterator
