@@ -8,12 +8,14 @@ from typing import Optional
 from telethon import TelegramClient
 
 
-@dataclasses.dataclass
+
 class Download:
-    link: str
-    path: str
-    last_check_date: datetime.datetime
-    zip_lock: asyncio.Lock = dataclasses.field(default_factory=lambda: asyncio.Lock(), kw_only=True)
+
+    def __init__(self, link: str, path: str, last_check_date: datetime.datetime) -> None:
+        self.link = link
+        self.path = path
+        self.last_check_date = last_check_date
+        self.zip_lock = asyncio.Lock()
 
     def list_files(self) -> list[str]:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
@@ -24,7 +26,6 @@ class Download:
         pass
 
 
-@dataclasses.dataclass
 class CompleteDownload(Download):
 
     def to_json(self) -> dict:
@@ -69,11 +70,21 @@ class SubscriptionDestination:
         )
 
 
-@dataclasses.dataclass
 class Subscription(Download):
-    destinations: list[SubscriptionDestination]
-    failed_checks: int
-    last_successful_check_date: datetime.datetime
+
+    def __init__(
+            self,
+            link: str,
+            path: str,
+            last_check_date: datetime.datetime,
+            destinations: list[SubscriptionDestination],
+            failed_checks: int,
+            last_successful_check_date: datetime.datetime,
+    ) -> None:
+        super().__init__(link, path, last_check_date)
+        self.destinations = destinations
+        self.failed_checks = failed_checks
+        self.last_successful_check_date = last_successful_check_date
 
     def __post_init__(self):
         for dest in self.destinations:
