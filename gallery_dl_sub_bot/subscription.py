@@ -3,11 +3,13 @@ import dataclasses
 import datetime
 import glob
 import html
-from typing import Optional
+import typing
+from typing import Optional, AsyncIterator
 
-from telethon import TelegramClient
+if typing.TYPE_CHECKING:
+    from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
-from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
+
 
 
 class Download:
@@ -17,12 +19,13 @@ class Download:
             link: str,
             path: str,
             last_check_date: datetime.datetime,
-            dl_manager: GalleryDLManager,
+            sub_manager: "SubscriptionManager",
     ) -> None:
         self.link = link
         self.path = path
         self.last_check_date = last_check_date
-        self.dl_manager = dl_manager
+        self.sub_manager = sub_manager
+        self.dl_manager = sub_manager.dl_manager
         self.zip_lock = asyncio.Lock()
 
     def list_files(self) -> list[str]:
@@ -48,12 +51,12 @@ class CompleteDownload(Download):
         }
 
     @classmethod
-    def from_json(cls, data: dict, dl_manager: GalleryDLManager) -> "CompleteDownload":
+    def from_json(cls, data: dict, sub_manager: "SubscriptionManager") -> "CompleteDownload":
         return cls(
             data["link"],
             data["path"],
             datetime.datetime.fromisoformat(data["last_check_date"]),
-            dl_manager,
+            sub_manager,
         )
 
 
@@ -90,17 +93,16 @@ class Subscription(Download):
             link: str,
             path: str,
             last_check_date: datetime.datetime,
-            dl_manager: GalleryDLManager,
+            sub_manager: "SubscriptionManager",
             destinations: list[SubscriptionDestination],
             failed_checks: int,
             last_successful_check_date: datetime.datetime,
-            client: TelegramClient,
     ) -> None:
-        super().__init__(link, path, last_check_date, dl_manager)
+        super().__init__(link, path, last_check_date, sub_manager)
         self.destinations = destinations
         self.failed_checks = failed_checks
         self.last_successful_check_date = last_successful_check_date
-        self.client = client
+        self.client = sub_manager.client
 
     def __post_init__(self):
         for dest in self.destinations:
@@ -117,16 +119,15 @@ class Subscription(Download):
         }
 
     @classmethod
-    def from_json(cls, data: dict, dl_manager: GalleryDLManager, client: TelegramClient) -> "Subscription":
+    def from_json(cls, data: dict, sub_manager: "SubscriptionManager") -> "Subscription":
         return cls(
             data["link"],
             data["path"],
             datetime.datetime.fromisoformat(data["last_check_date"]),
-            dl_manager,
+            sub_manager,
             [SubscriptionDestination.from_json(d) for d in data["destinations"]],
             data["failed_checks"],
             datetime.datetime.fromisoformat(data["last_successful_check_date"]),
-            client,
         )
 
     def matching_chat(self, chat_id: int) -> Optional[SubscriptionDestination]:
