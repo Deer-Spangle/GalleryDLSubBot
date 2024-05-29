@@ -25,11 +25,6 @@ class GalleryDLManager:
         if self.update_needed():
             await self.update_tool()
 
-    async def run(self, args: list[str]) -> str:
-        await self.check_update()
-        resp = await run_cmd(["gallery-dl", *args])
-        return resp
-
     async def run_iter(self, args: list[str]) -> AsyncIterator[str]:
         await self.check_update()
         async for line in run_cmd_iter(["gallery-dl", *args]):
@@ -49,13 +44,6 @@ class GalleryDLManager:
             link,
         ]
         return args
-
-    async def download(self, link: str, dl_path: str) -> list[str]:
-        resp = await self.run(self.dl_args(link, dl_path))  # TODO: Queueing
-        resp_clean = resp.strip()
-        if not resp_clean:
-            return []
-        return resp_clean.split("\n")
 
     def download_iter(self, link: str, dl_path: str) -> AsyncIterator[str]:
         run_iterator = self.run_iter(self.dl_args(link, dl_path))
