@@ -136,15 +136,22 @@ class Bot:
                 Button.inline("No thanks", "dl_zip:no"),
             ]]
         )
-        await event.reply(
-            f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
-            parse_mode="html",
-            buttons=[[
-                Button.inline("Yes, subscribe", "subscribe:yes"),
-                Button.inline("No thanks", "subscribe:no"),
-            ]],
-            link_preview=False,
-        )
+        if self.sub_manager.sub_for_link_and_chat(link, event.chat.id):
+            await event.reply(
+                f"You are already subscribed to {html.escape(link)} in this chat.",
+                parse_mode="html",
+                link_preview=False,
+            )
+        else:
+            await event.reply(
+                f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
+                parse_mode="html",
+                buttons=[[
+                    Button.inline("Yes, subscribe", "subscribe:yes"),
+                    Button.inline("No thanks", "subscribe:no"),
+                ]],
+                link_preview=False,
+            )
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
         query_data = event.query.data
