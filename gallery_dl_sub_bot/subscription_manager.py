@@ -184,7 +184,14 @@ class SubscriptionManager:
                 sub.last_check_date = now
                 sub.last_successful_check_date = now
                 self.save()
-            await asyncio.sleep(20)
+            await self._sleep(20)
+
+    async def _sleep(self, seconds: float) -> None:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        end = now + datetime.timedelta(seconds=seconds)
+        while self.running and now < end:
+            await asyncio.sleep(0.5)
+            now = datetime.datetime.now(datetime.timezone.utc)
 
     def stop(self) -> None:
         self.running = False
