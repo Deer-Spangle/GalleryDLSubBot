@@ -103,9 +103,7 @@ class Subscription(Download):
         self.failed_checks = failed_checks
         self.last_successful_check_date = last_successful_check_date
         self.client = sub_manager.client
-
-    def __post_init__(self):
-        for dest in self.destinations:
+        for dest in destinations:
             dest.subscription = self
 
     def to_json(self) -> dict:
