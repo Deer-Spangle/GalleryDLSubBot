@@ -1,9 +1,11 @@
 import asyncio
+import datetime
 import html
 import logging
 import os
 import re
 import uuid
+from typing import Optional
 
 import aioshutil
 from telethon import TelegramClient, events, Button
@@ -109,8 +111,24 @@ class Bot:
 
     async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
         evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html", link_preview=False)
+        lines = []
+        last_progress_update = datetime.datetime.now(datetime.timezone.utc)
+        last_line_count: Optional[int] = None
         try:
-            dl, lines = await self.sub_manager.create_download(link)
+            dl = await self.sub_manager.create_download(link)
+            async for lines_batch in dl.download():
+                lines += lines_batch
+                now = datetime.datetime.now(datetime.timezone.utc)
+                line_count = len(lines)
+                if (now - last_progress_update) < datetime.timedelta(seconds=10) or line_count == last_line_count:
+                    continue
+                await evt.edit(
+                    f"⏳ Downloading link: {html.escape(link)}\n(Found {line_count} images so far...)",
+                    parse_mode="html",
+                    link_preview=False,
+                )
+                last_progress_update = datetime.datetime.now(datetime.timezone.utc)
+                last_line_count = line_count
         except Exception as e:
             logger.error(f"Failed to download link {link}", exc_info=e)
             await evt.reply(f"Failed to download link {html.escape(link)} :(")

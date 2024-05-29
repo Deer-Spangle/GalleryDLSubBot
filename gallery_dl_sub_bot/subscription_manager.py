@@ -72,34 +72,19 @@ class SubscriptionManager:
             return None
         return matching_sub.matching_chat(chat_id)
 
-    async def create_download(self, link: str) -> tuple[Download, list[str]]:
+    async def create_download(self, link: str) -> Download:
         # See if a download already exists for this link
         matching_dl = self.download_for_link(link)
         if matching_dl:
-            dl_path = matching_dl.path
-            existing_files = matching_dl.list_files()
-            new_lines = await self.dl_manager.download(link, dl_path)
-            await matching_dl.send_new_items(new_lines[::-1])
-            now = datetime.datetime.now(datetime.timezone.utc)
-            matching_dl.last_check_date = now
-            self.save()
-            return matching_dl, existing_files + new_lines[::-1]
+            return matching_dl
         dl_path = f"store/downloads/{uuid.uuid4()}/"
-        # TODO: queueing
-        # TODO: in progress message
-        lines = await self.dl_manager.download(link, dl_path)
         now = datetime.datetime.now(datetime.timezone.utc)
         dl = CompleteDownload(
-            link,
-            dl_path,
-            now,
-            self,
+            link, dl_path, now, self
         )
         self.complete_downloads.append(dl)
         self.save()
-        return dl, lines
-        # current_files = matching_dl.list_files()
-        # new_files = matching_dl.update(self.dl_manager)
+        return dl
 
     async def delete_download(self, dl: Download) -> None:
         if isinstance(dl, CompleteDownload):
@@ -183,20 +168,21 @@ class SubscriptionManager:
                     continue
                 logger.info("Checking subscription to %s", sub.link)
                 # Try and fetch update
+                new_items = []
                 try:
-                    sub.last_check_date = now
-                    new_items = await self.dl_manager.download(sub.link, sub.path)
+                    async for line_batch in sub.download():
+                        new_items += line_batch
                 except Exception as e:
                     logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
                     sub.failed_checks += 1
                     continue
-                logger.info("There were %s new items in feed: %s", len(new_items), sub.link)
+                logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
+                if sub.active_download:
+                    logger.info("There were %s new items in feed: %s", len(sub.active_download.lines_so_far), sub.link)
                 # Update timestamps
                 now = datetime.datetime.now(datetime.timezone.utc)
                 sub.last_check_date = now
                 sub.last_successful_check_date = now
-                # Send items to destinations
-                await sub.send_new_items(new_items[::-1])
                 self.save()
             await asyncio.sleep(20)
 

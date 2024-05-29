@@ -10,6 +10,36 @@ if typing.TYPE_CHECKING:
     from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
 
+class ActiveDownload:
+    def __init__(self, dl: "Download", lines_at_start: list[str]) -> None:
+        self.dl = dl
+        self.lines_at_start = lines_at_start
+        self.lines_so_far = []
+        self.task = None
+        self.complete = False
+
+    def kill(self) -> None:  # TODO
+        raise NotImplementedError
+
+    async def run(self) -> AsyncIterator[list[str]]:
+        yield self.lines_at_start
+        async for line in self.dl.dl_manager.download_iter(self.dl.link, self.dl.path):
+            self.lines_so_far.append(line)
+            yield [line]
+        await self.dl.send_new_items(self.lines_so_far)
+        self.complete = True
+        self.dl.sub_manager.save()
+
+    async def track(self) -> AsyncIterator[list[str]]:
+        yield self.lines_at_start
+        high_water_mark = 0
+        while not self.complete:
+            new_lines = self.lines_so_far[high_water_mark:]
+            high_water_mark = high_water_mark + len(new_lines)
+            yield new_lines
+            await asyncio.sleep(1)
+        last_lines = self.lines_so_far[high_water_mark:]
+        yield last_lines
 
 
 class Download:
@@ -27,6 +57,7 @@ class Download:
         self.sub_manager = sub_manager
         self.dl_manager = sub_manager.dl_manager
         self.zip_lock = asyncio.Lock()
+        self.active_download: Optional[ActiveDownload] = None
 
     def list_files(self) -> list[str]:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
@@ -36,9 +67,14 @@ class Download:
     async def send_new_items(self, new_items: list[str]) -> None:
         pass
 
-
-    async def iter_lines(self) -> AsyncIterator[str]:
-        pass
+    def download(self) -> AsyncIterator[list[str]]:
+        active_download = self.active_download
+        if active_download is None or active_download.complete:
+            new_download = ActiveDownload(self, self.list_files())
+            self.active_download = new_download
+            self.last_check_date = datetime.datetime.now(datetime.timezone.utc)
+            return new_download.run()
+        return active_download.track()
 
 
 class CompleteDownload(Download):
