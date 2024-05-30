@@ -195,7 +195,7 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_filename = self.link_fixer.link_to_filename(link)
-            async with self.sub_manager.create_zip(dl, zip_filename) as zip_file:
+            async with dl.zip(zip_filename) as zip_file:
                 link_msg = await menu_msg.get_reply_message()
                 await link_msg.reply(
                     f"Here is the zip archive of {html.escape(link)}",

@@ -4,7 +4,11 @@ import datetime
 import glob
 import html
 import typing
+import uuid
+from contextlib import asynccontextmanager
 from typing import Optional, AsyncIterator
+
+import aioshutil
 
 if typing.TYPE_CHECKING:
     from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
@@ -75,6 +79,17 @@ class Download:
             self.last_check_date = datetime.datetime.now(datetime.timezone.utc)
             return new_download.run()
         return active_download.track()
+
+    @asynccontextmanager
+    async def zip(self, filename: str) -> AsyncIterator[str]:
+        zip_dir = f"store/zips/{uuid.uuid4()}"
+        zip_path = f"{zip_dir}/{filename}"
+        async with self.zip_lock:
+            try:
+                await aioshutil.make_archive(zip_path, "zip", self.path)
+                yield f"{zip_path}.zip"
+            finally:
+                await aioshutil.rmtree(zip_dir)
 
 
 class CompleteDownload(Download):

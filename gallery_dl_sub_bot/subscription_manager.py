@@ -4,8 +4,7 @@ import json
 import logging
 import uuid
 from asyncio import Task
-from contextlib import asynccontextmanager
-from typing import Optional, AsyncIterator
+from typing import Optional
 
 import aioshutil
 from telethon import TelegramClient
