@@ -17,11 +17,11 @@ def setup_logging() -> None:
     console_handler.setFormatter(formatter)
     base_logger.addHandler(console_handler)
 
-    # FA search bot log, for diagnosing the bot. Should not contain user information.
-    fa_logger = logging.getLogger("fa_search_bot")
+    # Gallery DL sub bot log, for diagnosing the bot. Should not contain user information.
+    bot_logger = logging.getLogger("gallery_dl_sub_bot")
     file_handler = TimedRotatingFileHandler("logs/gallery_dl_sub_bot.log", when="midnight")
     file_handler.setFormatter(formatter)
-    fa_logger.addHandler(file_handler)
+    bot_logger.addHandler(file_handler)
 
 
 if __name__ == '__main__':
