@@ -78,7 +78,7 @@ class Bot:
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
-        if not self.auth_manager.user_is_trusted(event.message.peer_id.user_id):
+        if not self.auth_manager.user_is_trusted(event.user_id):
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation
         link_regex = re.compile(r"(https?://|www\.|[^\s/]+\.com)[^\s'\"()[\]]+", re.I)
@@ -145,7 +145,7 @@ class Bot:
         # Otherwise post menus
         hidden_link = hidden_data({
             "link": link,
-            "user_id": str(event.message.peer_id.user_id),
+            "user_id": str(event.user_id),
         })
         await event.reply(
             f"Would you like to download these files as a zip?{hidden_link}",
@@ -252,7 +252,7 @@ class Bot:
 
     async def summon_subscription_menu(self, event: events.NewMessage.Event) -> None:
         chat_id = event.chat.id
-        user_id = event.message.peer_id.user_id
+        user_id = event.user_id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         if len(sub_dests) == 0:
             await event.reply("You have no subscriptions in this chat. Send a link to create one")
