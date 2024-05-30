@@ -109,6 +109,7 @@ class SubscriptionManager:
                 raise ValueError("Subscription already exists in this chat for this link")
             # Extend existing subscription
             current_dl.destinations.append(dest)
+            dest.subscription = current_dl
             self.save()
             return current_dl
         # If not a CompleteDownload, raise exception
