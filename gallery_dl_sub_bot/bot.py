@@ -131,7 +131,8 @@ class Bot:
                 last_line_count = line_count
         except Exception as e:
             logger.error(f"Failed to download link {link}", exc_info=e)
-            await evt.reply(f"Failed to download link {html.escape(link)} :(")
+            await event.reply(f"Failed to download link {html.escape(link)} :(")
+            await evt.delete()
             raise e
         # Post update on feed size
         await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
