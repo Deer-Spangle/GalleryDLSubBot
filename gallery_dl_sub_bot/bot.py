@@ -78,7 +78,7 @@ class Bot:
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
-        if not self.auth_manager.user_is_trusted(event.user_id):
+        if not self.auth_manager.user_is_trusted(event.sender_id):
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation
         link_regex = re.compile(r"(https?://|www\.|[^\s/]+\.com)[^\s'\"()[\]]+", re.I)
@@ -145,7 +145,7 @@ class Bot:
         # Otherwise post menus
         hidden_link = hidden_data({
             "link": link,
-            "user_id": str(event.user_id),
+            "user_id": str(event.sender_id),
         })
         await event.reply(
             f"Would you like to download these files as a zip?{hidden_link}",
@@ -155,7 +155,7 @@ class Bot:
                 Button.inline("No thanks", "dl_zip:no"),
             ]]
         )
-        if self.sub_manager.sub_for_link_and_chat(link, event.chat.id):
+        if self.sub_manager.sub_for_link_and_chat(link, event.chat_id):
             await event.reply(
                 f"You are already subscribed to {html.escape(link)} in this chat.",
                 parse_mode="html",
@@ -233,7 +233,7 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             try:
-                await self.sub_manager.create_subscription(link, menu_msg.chat.id, user_id, dl)
+                await self.sub_manager.create_subscription(link, menu_msg.chat_id, user_id, dl)
             except Exception as e:
                 logger.error(f"Failed to subscribe to {link}", exc_info=e)
                 await menu_msg.edit(
@@ -251,8 +251,8 @@ class Bot:
         await event.answer("Unrecognised response")
 
     async def summon_subscription_menu(self, event: events.NewMessage.Event) -> None:
-        chat_id = event.chat.id
-        user_id = event.user_id
+        chat_id = event.chat_id
+        user_id = event.sender_id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         if len(sub_dests) == 0:
             await event.reply("You have no subscriptions in this chat. Send a link to create one")
@@ -321,7 +321,7 @@ class Bot:
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
         # Get subscription list
-        chat_id = event.chat.id
+        chat_id = event.chat_id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         # Handle empty subscription list
         if len(sub_dests) == 0:
@@ -349,7 +349,7 @@ class Bot:
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
         # Get subscription list
-        chat_id = event.chat.id
+        chat_id = event.chat_id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
         # Handle empty subscription list
         if len(sub_dests) == 0:
@@ -419,7 +419,7 @@ class Bot:
             link_preview=False,
             buttons=None,
         )
-        chat_id = event.chat.id
+        chat_id = event.chat_id
         await self.sub_manager.remove_subscription(link, chat_id)
         await menu_msg.edit(
             f"Unsubscribed from {html.escape(link)}",
@@ -449,7 +449,7 @@ class Bot:
             await event.answer("Unrecognised pause callback")
             raise events.StopPropagation
         # Pause subscription
-        chat_id = event.chat.id
+        chat_id = event.chat_id
         await self.sub_manager.pause_subscription(link, chat_id, pause_sub)
         # Refresh menu menu
         pause_verb = "Paused" if pause_sub else "Resumed"
