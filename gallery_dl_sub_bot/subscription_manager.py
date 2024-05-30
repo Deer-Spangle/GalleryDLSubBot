@@ -88,6 +88,8 @@ class SubscriptionManager:
     async def delete_download(self, dl: Download) -> None:
         if isinstance(dl, CompleteDownload):
             self.complete_downloads.remove(dl)
+            if dl.active_download and False:
+                dl.active_download.kill()
             async with dl.zip_lock:
                 await aioshutil.rmtree(dl.path)
 
@@ -197,6 +199,11 @@ class SubscriptionManager:
         loop = asyncio.get_event_loop()
         if self.runner_task and not self.runner_task.done():
             loop.run_until_complete(self.runner_task)
+        # Kill all downloads in progress
+        for dl in self.all_downloads:
+            if dl.active_download is not None and not dl.active_download.complete:
+                dl.active_download.kill()
+        # Save config
         self.save()
 
     def list_subscriptions(self, chat_id: int, user_id: int) -> list[SubscriptionDestination]:

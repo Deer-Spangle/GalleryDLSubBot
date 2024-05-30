@@ -10,6 +10,8 @@ from typing import Optional, AsyncIterator
 
 import aioshutil
 
+from gallery_dl_sub_bot.run_cmd import Command
+
 if typing.TYPE_CHECKING:
     from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
@@ -21,13 +23,16 @@ class ActiveDownload:
         self.lines_so_far = []
         self.task = None
         self.complete = False
+        self.command: Optional[Command] = None
 
-    def kill(self) -> None:  # TODO
-        raise NotImplementedError
+    def kill(self) -> None:
+        if self.command is not None:
+            self.command.kill()
 
     async def run(self) -> AsyncIterator[list[str]]:
         yield self.lines_at_start
-        async for line in self.dl.dl_manager.download_iter(self.dl.link, self.dl.path):
+        self.command = await self.dl.dl_manager.download_cmd(self.dl.link, self.dl.path)
+        async for line in self.command.run_iter():
             self.lines_so_far.append(line)
             yield [line]
         await self.dl.send_new_items(self.lines_so_far)
