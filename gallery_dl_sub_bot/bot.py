@@ -32,8 +32,11 @@ class Bot:
 
     def __init__(self, config: dict) -> None:
         self.config = config
+        session_name = "gallery_dl_sub_bot"
+        if suffix := self.config["telegram"].get("session_suffix"):
+            session_name += f"__{suffix}"
         self.client = TelegramClient(
-            "gallery_dl_sub_bot", self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
+            session_name, self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
         )
         self.dl_manager = GalleryDLManager("config_gallery_dl.json")
         self.auth_manager = AuthManager("trusted_users.yaml")
