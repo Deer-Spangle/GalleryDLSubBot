@@ -140,9 +140,19 @@ class Bot:
         # Post update on feed size
         await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
         await evt.delete()
+        # If no images, stop now
+        if len(lines) == 0:
+            return
         # If less than 10 things, just post an album
         if len(lines) < 10:
-            await event.reply(f"{html.escape(link)}", parse_mode="html", file=lines)
+            caption = f"{html.escape(link)}"
+            # Check for caption override
+            data_file = f"{lines[0]}.json"
+            caption_override = self.link_fixer.override_caption(link, data_file)
+            if caption_override:
+                caption = caption_override
+            # Post the album
+            await event.reply(caption, parse_mode="html", file=lines)
             await self.sub_manager.delete_download(dl)
             return
         # Otherwise post menus
