@@ -81,7 +81,9 @@ class Bot:
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
+        logger.info("Got a message from user %s", event.sender_id)
         if not self.auth_manager.user_is_trusted(event.sender_id):
+            logger.info("Unauthorised user has sent a msg")
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation
         link_regex = re.compile(r"(https?://|www\.|[^\s/]+\.com)[^\s'\"()[\]]+", re.I)
