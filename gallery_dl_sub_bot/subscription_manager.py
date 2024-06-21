@@ -10,6 +10,7 @@ import aioshutil
 from telethon import TelegramClient
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
+from gallery_dl_sub_bot.link_fixer import LinkFixer
 from gallery_dl_sub_bot.subscription import (
     Subscription,
     SubscriptionDestination,
@@ -24,9 +25,10 @@ class SubscriptionManager:
     CONFIG_FILE = "subscriptions.json"
     SUB_UPDATE_AFTER = datetime.timedelta(hours=12)
 
-    def __init__(self, client: TelegramClient, dl_manager: GalleryDLManager) -> None:
+    def __init__(self, client: TelegramClient, dl_manager: GalleryDLManager, link_fixer: LinkFixer) -> None:
         self.client = client
         self.dl_manager = dl_manager
+        self.link_fixer = link_fixer
         try:
             with open(self.CONFIG_FILE, "r") as f:
                 config_data = json.load(f)

@@ -199,12 +199,17 @@ class Subscription(Download):
     async def send_new_items(self, new_items: list[str]) -> None:
         for new_item in new_items:
             file_handle = await self.client.upload_file(new_item)
+            caption = f"Update on feed: {html.escape(self.link)}"
+            data_filename = f"{new_item}.json"
+            caption_override = self.sub_manager.link_fixer.override_caption(self.link, data_filename)
+            if caption_override:
+                caption = caption_override
             for dest in self.destinations:
                 if dest.paused:
                     continue
                 await self.client.send_message(
                     entity=dest.chat_id,
                     file=file_handle,
-                    message=f"Update on feed: {html.escape(self.link)}",
+                    message=caption,
                     parse_mode="html",
                 )

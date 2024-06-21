@@ -40,8 +40,8 @@ class Bot:
         )
         self.dl_manager = GalleryDLManager("config_gallery_dl.json")
         self.auth_manager = AuthManager("trusted_users.yaml")
-        self.sub_manager = SubscriptionManager(self.client, self.dl_manager)
         self.link_fixer = LinkFixer()
+        self.sub_manager = SubscriptionManager(self.client, self.dl_manager, self.link_fixer)
 
     def run(self) -> None:
         self.client.start(bot_token=self.config["telegram"]["bot_token"])
