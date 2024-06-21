@@ -38,7 +38,7 @@ class SubscriptionManager:
             Subscription.from_json(sub_data, self) for sub_data in config_data.get("subscriptions", [])
         ]
         self.complete_downloads = [
-            CompleteDownload.from_json(dl_data, self) for dl_data in config_data.get("downloads", [])
+            CompleteDownload.from_json(dl_data, self) for dl_data in config_data.get("complete_downloads", [])
         ]
         self.running = False
         self.runner_task: Optional[Task] = None
