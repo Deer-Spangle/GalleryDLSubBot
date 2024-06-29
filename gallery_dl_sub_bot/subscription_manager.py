@@ -165,6 +165,7 @@ class SubscriptionManager:
         self.running = True
         logger.info("Starting subscription manager")
         while self.running:
+            logger.info("Checking which subscriptions need update")
             for sub in self.subscriptions[:]:
                 # Check if subscription needs update
                 now = datetime.datetime.now(datetime.timezone.utc)
@@ -179,6 +180,8 @@ class SubscriptionManager:
                 except Exception as e:
                     logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
                     sub.failed_checks += 1
+                    sub.last_check_date = datetime.datetime.now(datetime.timezone.utc)
+                    self.save()
                     continue
                 logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
                 if sub.active_download:
