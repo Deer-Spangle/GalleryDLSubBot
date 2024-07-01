@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import glob
 import html
+import logging
 import typing
 import uuid
 from contextlib import asynccontextmanager
@@ -14,6 +15,9 @@ from gallery_dl_sub_bot.run_cmd import Command
 
 if typing.TYPE_CHECKING:
     from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
+
+
+logger = logging.getLogger(__name__)
 
 
 class ActiveDownload:
@@ -32,9 +36,12 @@ class ActiveDownload:
     async def run(self) -> AsyncIterator[list[str]]:
         yield self.lines_at_start
         self.command = await self.dl.dl_manager.download_cmd(self.dl.link, self.dl.path)
-        async for line in self.command.run_iter():
-            self.lines_so_far.append(line)
-            yield [line]
+        try:
+            async for line in self.command.run_iter():
+                self.lines_so_far.append(line)
+                yield [line]
+        except Exception as e:
+            logger.warning("Failed to run active download: ", exc_info=e)
         await self.dl.send_new_items(self.lines_so_far)
         self.complete = True
         self.dl.sub_manager.save()
