@@ -104,7 +104,7 @@ class Download:
         async with self.zip_lock:
             try:
                 await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, self.path])
-                yield aiofiles.os.listdir(zip_dir)
+                yield await aiofiles.os.listdir(zip_dir)
             finally:
                 await aioshutil.rmtree(zip_dir)
 
