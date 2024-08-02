@@ -105,7 +105,7 @@ class Download:
             try:
                 await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, self.path])
                 zip_files = await aiofiles.os.listdir(zip_dir)
-                zip_paths = [f"{zip_dir}/{filename}.zip" for filename in zip_files]
+                zip_paths = [f"{zip_dir}/{filename}" for filename in zip_files]
                 yield zip_paths
             finally:
                 await aioshutil.rmtree(zip_dir)
