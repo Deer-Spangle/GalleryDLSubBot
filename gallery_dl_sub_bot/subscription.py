@@ -99,12 +99,14 @@ class Download:
     @asynccontextmanager
     async def zip(self, filename: str) -> AsyncIterator[list[str]]:
         zip_dir = f"store/zips/{uuid.uuid4()}"
-        os.makedirs(zip_dir, exist_ok=True)
+        await aiofiles.os.makedirs(zip_dir, exist_ok=True)
         zip_path = f"{zip_dir}/{filename}.zip"
         async with self.zip_lock:
             try:
                 await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, self.path])
-                yield await aiofiles.os.listdir(zip_dir)
+                zip_files = await aiofiles.os.listdir(zip_dir)
+                zip_paths = [f"{zip_dir}/{filename}.zip" for filename in zip_files]
+                yield zip_paths
             finally:
                 await aioshutil.rmtree(zip_dir)
 
