@@ -4,6 +4,7 @@ import datetime
 import glob
 import html
 import logging
+import os
 import typing
 import uuid
 from contextlib import asynccontextmanager
@@ -98,7 +99,8 @@ class Download:
     @asynccontextmanager
     async def zip(self, filename: str) -> AsyncIterator[list[str]]:
         zip_dir = f"store/zips/{uuid.uuid4()}"
-        zip_path = f"{zip_dir}/{filename}"
+        os.makedirs(zip_dir, exist_ok=True)
+        zip_path = f"{zip_dir}/{filename}.zip"
         async with self.zip_lock:
             try:
                 await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, self.path])
