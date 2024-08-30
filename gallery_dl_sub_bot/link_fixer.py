@@ -122,6 +122,6 @@ class LinkFixer:
         link = link.replace(".", "_").replace("/", "_")
         # Ensure no double underscores
         while "__" in link:
-            link.replace("__", "_")
+            link = link.replace("__", "_")
         # Return that
         return link
