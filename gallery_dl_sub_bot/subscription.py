@@ -100,10 +100,10 @@ class Download:
     async def zip(self, filename: str) -> AsyncIterator[list[str]]:
         zip_dir = f"store/zips/{uuid.uuid4()}"
         await aiofiles.os.makedirs(zip_dir, exist_ok=True)
-        zip_path = f"{zip_dir}/{filename}.zip"
+        zip_path = os.path.abspath(f"{zip_dir}/{filename}.zip")
         async with self.zip_lock:
             try:
-                await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, self.path])
+                await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, "./"], cwd=self.path)
                 zip_files = await aiofiles.os.listdir(zip_dir)
                 zip_paths = [f"{zip_dir}/{filename}" for filename in zip_files]
                 yield zip_paths
