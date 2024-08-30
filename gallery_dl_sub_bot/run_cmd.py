@@ -79,12 +79,13 @@ def _printable_cmd(args: list[str]) -> str:
     return " ".join(safe_args)
 
 
-async def run_cmd(args: list[str], timeout: int = DEFAULT_TIMEOUT) -> str:
+async def run_cmd(args: list[str], timeout: int = DEFAULT_TIMEOUT, cwd: Optional[str] = None) -> str:
     proc = await asyncio.create_subprocess_exec(
         *args,
         limit=1024 * 1024 * 5,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        cwd=cwd,
     )
     logger.info("Running subprocess: %s", _printable_cmd(args))
     try:

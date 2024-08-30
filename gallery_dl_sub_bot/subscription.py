@@ -4,20 +4,24 @@ import datetime
 import glob
 import html
 import logging
+import os
 import typing
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncIterator
 
+import aiofiles.os
 import aioshutil
 
-from gallery_dl_sub_bot.run_cmd import Command
+from gallery_dl_sub_bot.run_cmd import Command, run_cmd
 
 if typing.TYPE_CHECKING:
     from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
 
 logger = logging.getLogger(__name__)
+
+ZIP_SIZE_LIMIT = "1500m"
 
 
 class ActiveDownload:
@@ -93,13 +97,16 @@ class Download:
         return active_download.track()
 
     @asynccontextmanager
-    async def zip(self, filename: str) -> AsyncIterator[str]:
+    async def zip(self, filename: str) -> AsyncIterator[list[str]]:
         zip_dir = f"store/zips/{uuid.uuid4()}"
-        zip_path = f"{zip_dir}/{filename}"
+        await aiofiles.os.makedirs(zip_dir, exist_ok=True)
+        zip_path = os.path.abspath(f"{zip_dir}/{filename}.zip")
         async with self.zip_lock:
             try:
-                await aioshutil.make_archive(zip_path, "zip", self.path)
-                yield f"{zip_path}.zip"
+                await run_cmd(["zip", "-r", "-s", ZIP_SIZE_LIMIT, zip_path, "./"], cwd=self.path)
+                zip_files = await aiofiles.os.listdir(zip_dir)
+                zip_paths = [f"{zip_dir}/{filename}" for filename in zip_files]
+                yield sorted(zip_paths)
             finally:
                 await aioshutil.rmtree(zip_dir)
 

@@ -211,15 +211,34 @@ class Bot:
         if query_resp == b"yes":
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_filename = self.link_fixer.link_to_filename(link)
-            async with dl.zip(zip_filename) as zip_file:
+            async with dl.zip(zip_filename) as zip_files:
                 link_msg = await menu_msg.get_reply_message()
-                await link_msg.reply(
-                    f"Here is the zip archive of {html.escape(link)}",
-                    file=zip_file,
-                    parse_mode="html",
-                    link_preview=False,
-                )
-                await menu_msg.delete()
+                if len(zip_files) == 1:
+                    await link_msg.reply(
+                        f"Here is the zip archive of {html.escape(link)}",
+                        file=zip_files[0],
+                        parse_mode="html",
+                        link_preview=False,
+                    )
+                    await menu_msg.delete()
+                else:
+                    zip_count = len(zip_files)
+                    await link_msg.reply(
+                        f"Due to telegram size limits, zip archive was split into {zip_count} parts.\n"
+                        f"Here is part 1/{zip_count} of the zip archive of {html.escape(link)}\n"
+                        "Please download all parts before attempting to unzip the archive",
+                        file=zip_files[0],
+                        parse_mode="html",
+                        link_preview=False,
+                    )
+                    for n, zip_file in enumerate(zip_files[1:], start=2):
+                        await link_msg.reply(
+                            f"Here is part {n}/{zip_count} of the zip archive of {html.escape(link)}",
+                            file=zip_file,
+                            parse_mode="html",
+                            link_preview=False,
+                        )
+                    await menu_msg.delete()
             raise events.StopPropagation
         # Handle other callback data
         await event.answer("Unrecognised response")
