@@ -2,12 +2,9 @@ import asyncio
 import datetime
 import html
 import logging
-import os
 import re
-import uuid
 from typing import Optional
 
-import aioshutil
 from telethon import TelegramClient, events, Button
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
@@ -52,6 +49,10 @@ class Bot:
             self.summon_subscription_menu,
             events.NewMessage(pattern="/subscriptions", incoming=True),
         )
+        self.client.add_event_handler(
+            self.update_gallery_dl,
+            events.NewMessage(pattern="/update_gallery_dl", incoming=True)
+        )
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
         self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
@@ -59,6 +60,7 @@ class Bot:
         self.client.add_event_handler(self.view_subscription_menu, events.CallbackQuery(pattern="subs_menu:"))
         self.client.add_event_handler(self.handle_unsubscribe_callback, events.CallbackQuery(pattern="unsubscribe:"))
         self.client.add_event_handler(self.handle_pause_callback, events.CallbackQuery(pattern="pause:"))
+        self.client.add_event_handler(self.handle_update_callback, events.CallbackQuery(pattern="update:"))
         # Start listening
         try:
             # Start subscription manager
@@ -493,3 +495,94 @@ class Bot:
             link_preview=False,
             buttons=None,
         )
+
+    # noinspection PyMethodMayBeStatic
+    def _gallery_dl_version_text(self, version: str, install_type: str, last_update: datetime.datetime) -> str:
+        return (
+            f"Gallery-dl is currently on a {install_type} install, v{version}.\n"
+            f"Last update: {format_last_check(last_update)}"
+        )
+
+    async def update_gallery_dl(self, event: events.NewMessage.Event) -> None:
+        user_id = event.sender_id
+        logger.info("Request to update gallery-dl from %s", user_id)
+        # Check if they are authorised to use the bot
+        if not self.auth_manager.user_is_trusted(user_id):
+            logger.info("Unauthorised user has tried to update gallery-dl: %s", user_id)
+            await event.reply("Apologies, you are not authorised to operate this bot")
+            raise events.StopPropagation
+        # Check it is installed
+        if self.dl_manager.last_update is None:
+            inp = await event.reply("⏳ Checking gallery-dl install", parse_mode="html")
+            await self.dl_manager.check_install()
+            await inp.delete()
+        # Fetch current version
+        version = await self.dl_manager.get_tool_version()
+        install_type = self.dl_manager.install_type
+        last_update = self.dl_manager.last_update
+        # Send menu
+        menu_data = hidden_data({
+            "user_id": str(user_id),
+            "version": version,
+            "install_type": install_type,
+            "last_update": last_update.isoformat(),
+        })
+        version_text = self._gallery_dl_version_text(version, install_type, last_update)
+        await event.reply(
+            f"{menu_data}{version_text}\nWould you like to update it now?",
+            parse_mode="html",
+            buttons=[[
+                Button.inline("Update (stable)", "update:stable"),
+                Button.inline("Update (dev)", "update:dev"),
+                Button.inline("No thanks", "update:no"),
+            ]],
+        )
+        raise events.StopPropagation
+
+    async def handle_update_callback(self, event: events.CallbackQuery.Event) -> None:
+        # Parse callback data
+        query_data = event.query.data
+        query_resp = query_data.removeprefix(b"update:")
+        # Parse menu data
+        menu_msg = await event.get_message()
+        menu_data = parse_hidden_data(menu_msg)
+        user_id = int(menu_data["user_id"])
+        version = menu_data["version"]
+        install_type = menu_data["install_type"]
+        last_update = datetime.datetime.fromisoformat(menu_data["last_update"])
+        # Check button is pressed by user who summoned the menu
+        await _check_sender(event, user_id)
+        # Check callback data
+        if query_resp == b"stable":
+            update_func = self.dl_manager.update_tool
+        elif query_resp == b"dev":
+            update_func = self.dl_manager.update_tool_prerelease
+        elif query_resp == b"no":
+            update_func = None
+        else:
+            await event.answer("Unrecognised update callback")
+            raise events.StopPropagation
+        # Deactivate menu
+        await menu_msg.edit(
+            self._gallery_dl_version_text(version, install_type, last_update),
+            parse_mode="html",
+            link_preview=False,
+            buttons=None,
+        )
+        # Stop here if they said no
+        if update_func is None:
+            raise events.StopPropagation
+        # Update gallery-dl
+        evt = await event.reply("⏳ Updating gallery-dl", parse_mode="html")
+        try:
+            await update_func()
+        except Exception as e:
+            logger.warning("Failed to update gallery-dl", exc_info=e)
+            await event.reply("Failed to update gallery-dl, error during update :(")
+            await evt.delete()
+            raise events.StopPropagation
+        # Post completed message
+        new_version = await self.dl_manager.get_tool_version()
+        await event.reply(f"Updated gallery-dl to {new_version}")
+        await evt.delete()
+        raise events.StopPropagation
