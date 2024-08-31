@@ -2,6 +2,7 @@ import asyncio
 import logging
 from asyncio import StreamReader
 from asyncio.subprocess import Process
+from contextlib import asynccontextmanager
 from typing import TypeVar, Optional, Tuple, AsyncIterator
 
 import aiostream.stream
@@ -106,6 +107,15 @@ async def run_cmd(args: list[str], timeout: int = DEFAULT_TIMEOUT, cwd: Optional
     return stdout
 
 
+@asynccontextmanager
+async def optional_lock(lock: Optional[AsyncIterator]) -> AsyncIterator[None]:
+    if lock is None:
+        yield None
+    else:
+        async with lock:
+            yield None
+
+
 class Command:
 
     def __init__(
@@ -113,11 +123,13 @@ class Command:
             args: list[str],
             stdout_timeout: Optional[int] = DEFAULT_UPDATE_TIMEOUT,
             stderr_timeout: Optional[int] = DEFAULT_TIMEOUT,
+            lock: Optional[AsyncIterator] = None,
     ):
         self.args = args
         self.stdout_timeout = stdout_timeout
         self.stderr_timeout = stderr_timeout
         self.proc: Optional[Process] = None
+        self.lock = lock
 
     @property
     def printable_args(self) -> str:
@@ -134,31 +146,32 @@ class Command:
         stderr = self.proc.stderr
         stderr_lines = []
         logger.info("Running subprocess: %s", self.printable_args)
-        try:
-            combine = aiostream.stream.merge(
-                iter_stream(stdout, self.stdout_timeout, "stdout"),
-                iter_stream(stderr, self.stderr_timeout, "stderr"),
-            )
-            async with combine.stream() as streamer:
-                async for (stream, line) in streamer:
-                    if stream == stdout:
-                        yield line
-                    if stream == stderr:
-                        stderr_lines.append(line)
-            # A short timeout to close the subprocess, because the above should have ran it to completion.
-            await asyncio.wait_for(self.proc.communicate(), timeout=CLOSE_TIMEOUT)
-            return_code = self.proc.returncode
-        except asyncio.TimeoutError:
-            logger.error("Subprocess timed out, killing: %s", self.printable_args)
+        async with optional_lock(self.lock):
             try:
-                self.proc.kill()
-            except OSError:
-                pass
-            raise CmdException("Task timed out")
-        if return_code != 0:
-            logger.warning("Subprocess returned exit code %s: %s", return_code, self.printable_args)
-            all_stderr = "\n".join(stderr_lines)
-            raise CmdException(f"Task returned exit code {return_code}. stderr: {all_stderr}")
+                combine = aiostream.stream.merge(
+                    iter_stream(stdout, self.stdout_timeout, "stdout"),
+                    iter_stream(stderr, self.stderr_timeout, "stderr"),
+                )
+                async with combine.stream() as streamer:
+                    async for (stream, line) in streamer:
+                        if stream == stdout:
+                            yield line
+                        if stream == stderr:
+                            stderr_lines.append(line)
+                # A short timeout to close the subprocess, because the above should have ran it to completion.
+                await asyncio.wait_for(self.proc.communicate(), timeout=CLOSE_TIMEOUT)
+                return_code = self.proc.returncode
+            except asyncio.TimeoutError:
+                logger.error("Subprocess timed out, killing: %s", self.printable_args)
+                try:
+                    self.proc.kill()
+                except OSError:
+                    pass
+                raise CmdException("Task timed out")
+            if return_code != 0:
+                logger.warning("Subprocess returned exit code %s: %s", return_code, self.printable_args)
+                all_stderr = "\n".join(stderr_lines)
+                raise CmdException(f"Task returned exit code {return_code}. stderr: {all_stderr}")
 
     def kill(self) -> None:
         if self.proc is not None:
