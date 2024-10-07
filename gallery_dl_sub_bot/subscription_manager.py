@@ -7,7 +7,7 @@ from asyncio import Task
 from typing import Optional
 
 import aioshutil
-from prometheus_client import Gauge, Counter
+from prometheus_client import Gauge, Counter, Histogram
 from telethon import TelegramClient
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
@@ -56,6 +56,16 @@ latest_check_if_updates_needed_time = Gauge(
 latest_subscription_checked_time = Gauge(
     "gallerydlsubbot_latest_subscription_checked_unixtime",
     "Timestamp of the last time the subscription manager checked a subscription for updates",
+)
+subscription_check_new_items = Histogram(
+    "gallerydlsubbot_subscription_update_size_items",
+    "Number of new items found when updating a subscription",
+    buckets=[0, 1, 5, 10, 50, 100]
+)
+subscription_check_time = Histogram(
+    "gallerydlsubbot_subscription_update_time_seconds",
+    "Amount of time, in seconds, that it took to update a subscription",
+    buckets=[1, 5, 60, 300, 600, (30 * 60), (3 * 60 * 60)]
 )
 subscription_new_items_found = Counter(
     "gallerydlsubbot_subscription_new_items_found_total",
@@ -246,8 +256,9 @@ class SubscriptionManager:
                 # Try and fetch update
                 new_items = []
                 try:
-                    async for line_batch in sub.download():
-                        new_items += line_batch
+                    with subscription_check_time.time():
+                        async for line_batch in sub.download():
+                            new_items += line_batch
                 except Exception as e:
                     logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
                     sub.failed_checks += 1
@@ -257,6 +268,7 @@ class SubscriptionManager:
                 logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
                 if sub.active_download:
                     logger.info("There were %s new items in feed: %s", len(sub.active_download.lines_so_far), sub.link)
+                    subscription_check_new_items.observe(len(sub.active_download.lines_so_far))
                     subscription_new_items_found.inc(len(sub.active_download.lines_so_far))
                 # Update timestamps
                 now = datetime.datetime.now(datetime.timezone.utc)
