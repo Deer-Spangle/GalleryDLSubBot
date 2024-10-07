@@ -69,7 +69,7 @@ subscription_total_items_stored = Gauge(
 
 class SubscriptionManager:
     CONFIG_FILE = "subscriptions.json"
-    SUB_UPDATE_AFTER = datetime.timedelta(hours=12)
+    SUB_UPDATE_AFTER = datetime.timedelta(hours=5)
 
     def __init__(self, client: TelegramClient, dl_manager: GalleryDLManager, link_fixer: LinkFixer) -> None:
         self.client = client
