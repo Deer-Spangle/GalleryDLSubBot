@@ -74,7 +74,7 @@ initial_download_size = Histogram(
     buckets=[0, 1, 5, 10, 50, 100, 500, 1000, 10_000]
 )
 initial_download_time = Histogram(
-    "gallerydldubbot_initial_download_time_seconds",
+    "gallerydlsubbot_initial_download_time_seconds",
     "Amount of time, in seconds, that the initial download of a URL took",
     buckets=[1, 5, 60, 300, 600, (30 * 60), (3 * 60 * 60)]
 )
