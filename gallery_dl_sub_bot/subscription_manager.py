@@ -57,6 +57,10 @@ latest_subscription_checked_time = Gauge(
     "gallerydlsubbot_latest_subscription_checked_unixtime",
     "Timestamp of the last time the subscription manager checked a subscription for updates",
 )
+subscription_watcher_running = Gauge(
+    "gallerydlsubbot_subscription_watcher_running",
+    "Whether the subscription watcher is running or not",
+)
 subscription_check_new_items = Histogram(
     "gallerydlsubbot_subscription_update_size_items",
     "Number of new items found when updating a subscription",
@@ -96,6 +100,10 @@ class SubscriptionManager:
         self.complete_downloads = [
             CompleteDownload.from_json(dl_data, self) for dl_data in config_data.get("complete_downloads", [])
         ]
+        self.running = False
+        self.runner_task: Optional[Task] = None
+        # Metrics
+        subscription_watcher_running.set_function(lambda: int(self.running))
         completed_download_count.set_function(lambda: len(self.complete_downloads))
         subscription_count.set_function(lambda: len(self.subscriptions))
         subscription_destination_count.set_function(
@@ -114,8 +122,6 @@ class SubscriptionManager:
             lambda: len([s for s in self.subscriptions if s.failed_checks >= 1])
         )
         subscription_total_items_stored.set_function(self.count_total_files_stored)
-        self.running = False
-        self.runner_task: Optional[Task] = None
 
     @property
     def all_downloads(self) -> list[Download]:
@@ -244,38 +250,45 @@ class SubscriptionManager:
         self.running = True
         logger.info("Starting subscription manager")
         while self.running:
-            logger.info("Checking which subscriptions need update")
-            for sub in self.subscriptions[:]:
-                latest_check_if_updates_needed_time.set_to_current_time()
-                # Check if subscription needs update
-                now = datetime.datetime.now(datetime.timezone.utc)
-                if (now - sub.last_check_date) < self.SUB_UPDATE_AFTER:
-                    continue
-                logger.info("Checking subscription to %s", sub.link)
-                latest_subscription_checked_time.set_to_current_time()
-                # Try and fetch update
-                new_items = []
-                try:
-                    with subscription_check_time.time():
-                        async for line_batch in sub.download():
-                            new_items += line_batch
-                except Exception as e:
-                    logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
-                    sub.failed_checks += 1
-                    sub.last_check_date = datetime.datetime.now(datetime.timezone.utc)
-                    self.save()
-                    continue
-                logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
-                if sub.active_download:
-                    logger.info("There were %s new items in feed: %s", len(sub.active_download.lines_so_far), sub.link)
-                    subscription_check_new_items.observe(len(sub.active_download.lines_so_far))
-                    subscription_new_items_found.inc(len(sub.active_download.lines_so_far))
-                # Update timestamps
-                now = datetime.datetime.now(datetime.timezone.utc)
-                sub.last_check_date = now
-                sub.last_successful_check_date = now
+            try:
+                await self._check_for_updates()
+                await self._sleep(20)
+            except Exception as e:
+                logger.critical("Subscription watcher has failed: ", exc_info=e)
+                self.running = False
+
+    async def _check_for_updates(self) -> None:
+        logger.info("Checking which subscriptions need update")
+        for sub in self.subscriptions[:]:
+            latest_check_if_updates_needed_time.set_to_current_time()
+            # Check if subscription needs update
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if (now - sub.last_check_date) < self.SUB_UPDATE_AFTER:
+                continue
+            logger.info("Checking subscription to %s", sub.link)
+            latest_subscription_checked_time.set_to_current_time()
+            # Try and fetch update
+            new_items = []
+            try:
+                with subscription_check_time.time():
+                    async for line_batch in sub.download():
+                        new_items += line_batch
+            except Exception as e:
+                logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
+                sub.failed_checks += 1
+                sub.last_check_date = datetime.datetime.now(datetime.timezone.utc)
                 self.save()
-            await self._sleep(20)
+                continue
+            logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
+            if sub.active_download:
+                logger.info("There were %s new items in feed: %s", len(sub.active_download.lines_so_far), sub.link)
+                subscription_check_new_items.observe(len(sub.active_download.lines_so_far))
+                subscription_new_items_found.inc(len(sub.active_download.lines_so_far))
+            # Update timestamps
+            now = datetime.datetime.now(datetime.timezone.utc)
+            sub.last_check_date = now
+            sub.last_successful_check_date = now
+            self.save()
 
     async def _sleep(self, seconds: float) -> None:
         now = datetime.datetime.now(datetime.timezone.utc)
