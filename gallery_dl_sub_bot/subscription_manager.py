@@ -46,7 +46,7 @@ subscription_destination_count_active = Gauge(
     "Total number of non-paused subscription-destination pairs in the subscription manager at the moment",
 )
 subscription_count_failing = Gauge(
-    "gallerydlsubbot_active_subscription_count",
+    "gallerydlsubbot_failing_subscription_count",
     "Total number of subscriptions which have failed their most recent check",
 )
 latest_check_if_updates_needed_time = Gauge(
