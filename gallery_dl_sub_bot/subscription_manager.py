@@ -7,6 +7,7 @@ from asyncio import Task
 from typing import Optional
 
 import aioshutil
+from prometheus_client import Gauge, Counter
 from telethon import TelegramClient
 
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
@@ -19,6 +20,51 @@ from gallery_dl_sub_bot.subscription import (
 )
 
 logger = logging.getLogger(__name__)
+
+completed_download_count = Gauge(
+    "gallerydlsubbot_total_completed_download_count",
+    "Total number of completed downloads which have not been subscribed to",
+)
+subscription_count = Gauge(
+    "gallerydlsubbot_total_subscription_count",
+    "Total number of subscriptions in the subscription manager at the moment",
+)
+subscription_destination_count = Gauge(
+    "gallerydlsubbot_total_subscription_destination_count",
+    "Total number of subscription-destination pairs at the moment",
+)
+unique_destination_count = Gauge(
+    "gallerydlsubbot_unique_destination_count",
+    "Total number of unique destinations which subscriptions are sending to",
+)
+unique_subscription_creator_count = Gauge(
+    "gallerydlsubbot_unique_subscription_creator_count",
+    "Total number of unique subscription creators"
+)
+subscription_destination_count_active = Gauge(
+    "gallerydlsubbot_active_subscription_count",
+    "Total number of non-paused subscription-destination pairs in the subscription manager at the moment",
+)
+subscription_count_failing = Gauge(
+    "gallerydlsubbot_active_subscription_count",
+    "Total number of subscriptions which have failed their most recent check",
+)
+latest_check_if_updates_needed_time = Gauge(
+    "gallerydlsubbot_latest_check_if_updates_needed_unixtime",
+    "Timestamp of the latest time the subscription manager checked whether any subscriptions need updating"
+)
+latest_subscription_checked_time = Gauge(
+    "gallerydlsubbot_latest_subscription_checked_unixtime",
+    "Timestamp of the last time the subscription manager checked a subscription for updates",
+)
+subscription_new_items_found = Counter(
+    "gallerydlsubbot_subscription_new_items_found_total",
+    "Total number of new items found by subscriptions",
+)
+subscription_total_items_stored = Gauge(
+    "gallerydlsubbot_subscription_total_items_stored",
+    "Total number of items stored by subscriptions",
+)
 
 
 class SubscriptionManager:
@@ -40,12 +86,35 @@ class SubscriptionManager:
         self.complete_downloads = [
             CompleteDownload.from_json(dl_data, self) for dl_data in config_data.get("complete_downloads", [])
         ]
+        completed_download_count.set_function(lambda: len(self.complete_downloads))
+        subscription_count.set_function(lambda: len(self.subscriptions))
+        subscription_destination_count.set_function(
+            lambda: len([d for s in self.subscriptions for d in s.destinations])
+        )
+        subscription_destination_count_active.set_function(
+            lambda: len([d for s in self.subscriptions for d in s.destinations if not d.paused])
+        )
+        unique_destination_count.set_function(
+            lambda: len(set([d.chat_id for s in self.subscriptions for d in s.destinations]))
+        )
+        unique_subscription_creator_count.set_function(
+            lambda: len(set([d.creator_id for s in self.subscriptions for d in s.destinations]))
+        )
+        subscription_count_failing.set_function(
+            lambda: len([s for s in self.subscriptions if s.failed_checks >= 1])
+        )
+        subscription_total_items_stored.set_function(self.count_total_files_stored)
         self.running = False
         self.runner_task: Optional[Task] = None
 
     @property
     def all_downloads(self) -> list[Download]:
         return self.subscriptions[:] + self.complete_downloads[:]
+
+    def count_total_files_stored(self) -> int:
+        return sum(
+            len(s.list_files()) for s in self.subscriptions
+        )
 
     def save(self) -> None:
         config_data = {
@@ -167,11 +236,13 @@ class SubscriptionManager:
         while self.running:
             logger.info("Checking which subscriptions need update")
             for sub in self.subscriptions[:]:
+                latest_check_if_updates_needed_time.set_to_current_time()
                 # Check if subscription needs update
                 now = datetime.datetime.now(datetime.timezone.utc)
                 if (now - sub.last_check_date) < self.SUB_UPDATE_AFTER:
                     continue
                 logger.info("Checking subscription to %s", sub.link)
+                latest_subscription_checked_time.set_to_current_time()
                 # Try and fetch update
                 new_items = []
                 try:
@@ -186,6 +257,7 @@ class SubscriptionManager:
                 logger.info("In total there are %s items in feed: %s", len(new_items), sub.link)
                 if sub.active_download:
                     logger.info("There were %s new items in feed: %s", len(sub.active_download.lines_so_far), sub.link)
+                    subscription_new_items_found.inc(len(sub.active_download.lines_so_far))
                 # Update timestamps
                 now = datetime.datetime.now(datetime.timezone.utc)
                 sub.last_check_date = now

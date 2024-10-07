@@ -16,13 +16,14 @@ class GalleryDLManager:
 
     def __init__(self, config_path: Optional[str] = None):
         self.config_path: Optional[str] = config_path
-        self.last_update: Optional[datetime.datetime] = None
-        self.install_type: Optional[str] = None
+        self.last_update: Optional[datetime.datetime] = None  # TODO: metrics, but would need to actually store it
+        self.install_type: Optional[str] = None  # TODO: metric?
         self.rwlock = aiorwlock.RWLock()
 
     async def get_tool_version(self) -> str:
         logger.info("Checking gallery-dl version")
         async with self.rwlock.reader_lock:
+            # TODO: would be cool to have a prometheus metric for this
             pkg_info = await run_cmd(["pip", "show", self.GALLERY_DL_PKG])
             version_line = [line for line in pkg_info.split("\n") if line.startswith("Version: ")]
             if not version_line:

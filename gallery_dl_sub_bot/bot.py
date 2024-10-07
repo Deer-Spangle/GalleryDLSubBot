@@ -5,6 +5,7 @@ import logging
 import re
 from typing import Optional
 
+from prometheus_client import Gauge, start_http_server, Counter, Histogram
 from telethon import TelegramClient, events, Button
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
@@ -16,6 +17,67 @@ from gallery_dl_sub_bot.subscription import SubscriptionDestination
 from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
 logger = logging.getLogger(__name__)
+
+PROM_PORT = 7168
+start_time = Gauge("gallerydlsubbot_start_unixtime", "Unix timestamp of the last time the bot was started")
+boop_usage_count = Counter(
+    "gallerydlsubbot_usage_boop_count",
+    "Count of how many times the boop function has been used",
+)
+start_usage_count = Counter(
+    "gallerydlsubbot_start_usage_count",
+    "Count of how many times the start function has been used",
+)
+subscription_menu_summon_count = Counter(
+    "gallerydlsubbot_subscription_menu_summon_count",
+    "Count of how many times someone has summoned a subscription menu",
+)
+gallery_dl_update_menu_summon_count = Counter(
+    "gallerydlsubbot_gallery_dl_update_menu_summon_count",
+    "Count of how many times someone has summoned the menu to update gallery-dl",
+)
+zip_request_count = Counter(
+    "gallerydlsubbot_zip_download_request_count",
+    "Count of how many times someone requests a zip download",
+)
+subscribe_request_count = Counter(
+    "gallerydlsubbot_subscribe_request_count",
+    "Count of how many times someone requests to subscribe to a URL",
+)
+unsubscribe_request_count = Counter(
+    "gallerydlsubbot_unsubscribe_request_count",
+    "Count of how many times someone requests to unsubscribe from a URL",
+)
+pause_request_count = Counter(
+    "gallerydlsubbot_pause_request_count",
+    "Count of how many times someone requests to pause a subscription",
+)
+unpause_request_count = Counter(
+    "gallerydlsubbot_unpause_request_count",
+    "Count of how many times someone requests to unpause a subscription",
+)
+failed_auth_attempts = Counter(
+    "gallerydlsubbot_failed_auth_attempt_count",
+    "Number of times someone has been denied auth for an action they attempted to do",
+)
+url_request_message_count = Counter(
+    "gallerydlsubbot_url_request_message_count",
+    "Number of times someone has sent a message to the bot with a link in it to download",
+)
+url_request_url_count = Counter(
+    "gallerydlsubbot_url_request_url_count",
+    "Number of URLs which have been sent to the bot to download",
+)
+initial_download_size = Histogram(
+    "gallerydlsubbot_initial_download_size_items",
+    "Number of items in the initial download of a URL",
+    buckets=[0, 1, 5, 10, 50, 100, 500, 1000, 10_000]
+)
+initial_download_time = Histogram(
+    "gallerydldubbot_initial_download_time_seconds",
+    "Amount of time, in seconds, that the initial download of a URL took",
+    buckets=[1, 5, 60, 300, 600, (30 * 60), (3 * 60 * 60)]
+)
 
 
 async def _check_sender(evt: events.CallbackQuery.Event, allowed_user_id: int) -> None:
@@ -41,6 +103,7 @@ class Bot:
         self.sub_manager = SubscriptionManager(self.client, self.dl_manager, self.link_fixer)
 
     def run(self) -> None:
+        start_time.set_to_current_time()
         self.client.start(bot_token=self.config["telegram"]["bot_token"])
         # Register functions
         self.client.add_event_handler(self.start, events.NewMessage(pattern="/start", incoming=True))
@@ -61,6 +124,8 @@ class Bot:
         self.client.add_event_handler(self.handle_unsubscribe_callback, events.CallbackQuery(pattern="unsubscribe:"))
         self.client.add_event_handler(self.handle_pause_callback, events.CallbackQuery(pattern="pause:"))
         self.client.add_event_handler(self.handle_update_callback, events.CallbackQuery(pattern="update:"))
+        # Start prometheus server
+        start_http_server(PROM_PORT)
         # Start listening
         try:
             # Start subscription manager
@@ -74,17 +139,20 @@ class Bot:
 
     # noinspection PyMethodMayBeStatic
     async def boop(self, event: events.NewMessage.Event) -> None:
+        boop_usage_count.inc()
         await event.reply("Boop!")
         raise events.StopPropagation
 
     # noinspection PyMethodMayBeStatic
     async def start(self, event: events.NewMessage.Event) -> None:
+        start_usage_count.inc()
         await event.reply("Hey there! I'm not a very good bot yet, I'm quite early in development.")
         raise events.StopPropagation
 
     async def check_for_links(self, event: events.NewMessage.Event) -> None:
         logger.info("Got a message from user %s", event.sender_id)
         if not self.auth_manager.user_is_trusted(event.sender_id):
+            failed_auth_attempts.inc()
             logger.info("Unauthorised user has sent a msg")
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation
@@ -108,6 +176,9 @@ class Bot:
             fixed_link = self.link_fixer.fix_link(link)
             if fixed_link not in fixed_links:
                 fixed_links.append(fixed_link)
+        # Increment metrics
+        url_request_message_count.inc()
+        url_request_url_count.inc(len(fixed_links))
         # Tell the user all the links
         if len(fixed_links) > 1:
             lines = [f"- {html.escape(link)}" for link in fixed_links]
@@ -121,27 +192,29 @@ class Bot:
         lines = []
         last_progress_update = datetime.datetime.now(datetime.timezone.utc)
         last_line_count: Optional[int] = None
-        try:
-            dl = await self.sub_manager.create_download(link)
-            async for lines_batch in dl.download():
-                lines += lines_batch
-                now = datetime.datetime.now(datetime.timezone.utc)
-                line_count = len(lines)
-                if (now - last_progress_update) < datetime.timedelta(seconds=10) or line_count == last_line_count:
-                    continue
-                await evt.edit(
-                    f"⏳ Downloading link: {html.escape(link)}\n(Found {line_count} images so far...)",
-                    parse_mode="html",
-                    link_preview=False,
-                )
-                last_progress_update = datetime.datetime.now(datetime.timezone.utc)
-                last_line_count = line_count
-        except Exception as e:
-            logger.error(f"Failed to download link {link}", exc_info=e)
-            await event.reply(f"Failed to download link {html.escape(link)} :(")
-            await evt.delete()
-            raise e
+        with initial_download_time.time():
+            try:
+                dl = await self.sub_manager.create_download(link)
+                async for lines_batch in dl.download():
+                    lines += lines_batch
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    line_count = len(lines)
+                    if (now - last_progress_update) < datetime.timedelta(seconds=10) or line_count == last_line_count:
+                        continue
+                    await evt.edit(
+                        f"⏳ Downloading link: {html.escape(link)}\n(Found {line_count} images so far...)",
+                        parse_mode="html",
+                        link_preview=False,
+                    )
+                    last_progress_update = datetime.datetime.now(datetime.timezone.utc)
+                    last_line_count = line_count
+            except Exception as e:
+                logger.error(f"Failed to download link {link}", exc_info=e)
+                await event.reply(f"Failed to download link {html.escape(link)} :(")
+                await evt.delete()
+                raise e
         # Post update on feed size
+        initial_download_size.observe(len(lines))
         await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
         await evt.delete()
         # If no images, stop now
@@ -211,6 +284,7 @@ class Bot:
             raise events.StopPropagation
         # Handle yes button
         if query_resp == b"yes":
+            zip_request_count.inc()
             await menu_msg.edit("⏳ Creating zip archive...", buttons=None)
             zip_filename = self.link_fixer.link_to_filename(link)
             async with dl.zip(zip_filename) as zip_files:
@@ -267,6 +341,7 @@ class Bot:
             raise events.StopPropagation
         # Handle yes button press
         if query_resp == b"yes":
+            subscribe_request_count.inc()
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             try:
                 await self.sub_manager.create_subscription(link, menu_msg.chat_id, user_id, dl)
@@ -287,6 +362,7 @@ class Bot:
         await event.answer("Unrecognised response")
 
     async def summon_subscription_menu(self, event: events.NewMessage.Event) -> None:
+        subscription_menu_summon_count.inc()
         chat_id = event.chat_id
         user_id = event.sender_id
         sub_dests = self.sub_manager.list_subscriptions(chat_id, user_id)
@@ -449,6 +525,7 @@ class Bot:
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
         # Unsubscribe
+        unsubscribe_request_count.inc()
         await menu_msg.edit(
             f"⏳ Unsubscribing from {html.escape(link)}...",
             parse_mode="html",
@@ -478,8 +555,10 @@ class Bot:
         await _check_sender(event, user_id)
         # Check callback data
         if query_resp == b"pause":
+            pause_request_count.inc()
             pause_sub = True
         elif query_resp == b"resume":
+            unpause_request_count.inc()
             pause_sub = False
         else:
             await event.answer("Unrecognised pause callback")
@@ -504,10 +583,12 @@ class Bot:
         )
 
     async def update_gallery_dl(self, event: events.NewMessage.Event) -> None:
+        gallery_dl_update_menu_summon_count.inc()
         user_id = event.sender_id
         logger.info("Request to update gallery-dl from %s", user_id)
         # Check if they are authorised to use the bot
         if not self.auth_manager.user_is_trusted(user_id):
+            failed_auth_attempts.inc()
             logger.info("Unauthorised user has tried to update gallery-dl: %s", user_id)
             await event.reply("Apologies, you are not authorised to operate this bot")
             raise events.StopPropagation

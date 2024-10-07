@@ -12,6 +12,7 @@ from typing import Optional, AsyncIterator
 
 import aiofiles.os
 import aioshutil
+from prometheus_client import Counter
 
 from gallery_dl_sub_bot.run_cmd import Command, run_cmd
 
@@ -22,6 +23,10 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 ZIP_SIZE_LIMIT = "1500m"
+subscription_posts_made = Counter(
+    "gallerydlsubbot_subscription_posts_made_total",
+    "Total number of posts made by subscription updates",
+)
 
 
 class ActiveDownload:
@@ -221,6 +226,7 @@ class Subscription(Download):
             for dest in self.destinations:
                 if dest.paused:
                     continue
+                subscription_posts_made.inc()
                 await self.client.send_message(
                     entity=dest.chat_id,
                     file=file_handle,

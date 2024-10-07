@@ -16,6 +16,7 @@ aiostream = "^0.6.1"
 jinja2 = "^3.1.4"
 aiofiles = "^24.1.0"
 aiorwlock = "^1.4.0"
+prometheus-client = "^0.21.0"
 
 
 [build-system]
