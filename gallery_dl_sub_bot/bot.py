@@ -29,6 +29,7 @@ boop_usage_count = function_usage_count.labels(function="Boop")
 start_usage_count = function_usage_count.labels(function="Start menu")
 subscription_menu_summon_count = function_usage_count.labels(function="Summon subscription menu")
 gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
+embed_request_count = function_usage_count.labels(function="Embed request")
 zip_request_count = function_usage_count.labels(function="Zip request")
 subscribe_request_count = function_usage_count.labels(function="Subscription request")
 unsubscribe_request_count = function_usage_count.labels(function="Unsubscribe request")
@@ -63,6 +64,8 @@ async def _check_sender(evt: events.CallbackQuery.Event, allowed_user_id: int) -
 
 class Bot:
     SUBS_PER_MENU_PAGE = 10
+    MAX_ALBUM_SIZE = 10
+    MAX_OPTIONAL_ALBUMS_SIZE = 100
 
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -92,6 +95,7 @@ class Bot:
             events.NewMessage(pattern="/update_gallery_dl", incoming=True)
         )
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
+        self.client.add_event_handler(self.handle_embed_callback, events.CallbackQuery(pattern="embed:"))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
         self.client.add_event_handler(self.handle_subscribe_callback, events.CallbackQuery(pattern="subscribe:"))
         self.client.add_event_handler(self.page_subscriptions_menu, events.CallbackQuery(pattern="subs_offset:"))
@@ -196,15 +200,8 @@ class Bot:
         if len(lines) == 0:
             return
         # If less than 10 things, just post an album
-        if len(lines) < 10:
-            caption = f"{html.escape(link)}"
-            # Check for caption override
-            data_file = f"{lines[0]}.json"
-            caption_override = self.link_fixer.override_caption(link, data_file)
-            if caption_override:
-                caption = caption_override
-            # Post the album
-            await event.reply(caption, parse_mode="html", file=lines)
+        if len(lines) < self.MAX_ALBUM_SIZE:
+            await self._post_album(event, lines, link)
             await self.sub_manager.delete_download(dl)
             return
         # Otherwise post menus
@@ -212,6 +209,17 @@ class Bot:
             "link": link,
             "user_id": str(event.sender_id),
         })
+        # If it's not too many, offer to send anyway
+        if len(lines) < 100:
+            await event.reply(
+                f"Would you like me to send them as Telegram albums anyway?{hidden_link}",
+                parse_mode="html",
+                buttons=[[
+                    Button.inline("Yes", "embed:yes"),
+                    Button.inline("No thanks", "embed:no")
+                ]]
+            )
+        # Offer to zip up the feed
         await event.reply(
             f"Would you like to download these files as a zip?{hidden_link}",
             parse_mode="html",
@@ -220,6 +228,7 @@ class Bot:
                 Button.inline("No thanks", "dl_zip:no"),
             ]]
         )
+        # Unless already subscribed, offer to subscribe
         if self.sub_manager.sub_for_link_and_chat(link, event.chat_id):
             await event.reply(
                 f"You are already subscribed to {html.escape(link)} in this chat.",
@@ -236,6 +245,50 @@ class Bot:
                 ]],
                 link_preview=False,
             )
+
+    async def _post_album(self, event: events.NewMessage.Event, lines: list[str], link: str) -> None:
+        caption = f"{html.escape(link)}"
+        # Check for caption override
+        data_file = f"{lines[0]}.json"
+        caption_override = self.link_fixer.override_caption(link, data_file)
+        if caption_override:
+            caption = caption_override
+        # Post the album
+        await event.reply(caption, parse_mode="html", file=lines)
+        return
+
+    async def handle_embed_callback(self, event: events.CallbackQuery.Event) -> None:
+        query_data = event.query.data
+        query_resp = query_data.removeprefix(b"embed:")
+        logger.info(f"Callback query pressed: {query_data}")
+        menu_msg = await event.get_message()
+        # Parse menu data
+        menu_data = parse_hidden_data(menu_msg)
+        link = menu_data["link"]
+        user_id = int(menu_data["user_id"])
+        # Check button is pressed by user who summoned the menu
+        await _check_sender(event, user_id)
+        # Find the matching Download
+        dl = self.sub_manager.download_for_link(link)
+        if dl is None:
+            await menu_msg.edit("Error: This download seems to have disappeared", buttons=None)
+            raise events.StopPropagation
+        # Handle no button
+        if query_resp == b"no":
+            await menu_msg.delete()
+            raise events.StopPropagation
+        # Handle yes button
+        if query_resp == b"yes":
+            embed_request_count.inc()
+            lines = dl.list_files()
+            link_msg = await menu_msg.get_reply_message()
+            for start in range(0, len(lines), self.MAX_ALBUM_SIZE):
+                lines_chunk = lines[start:start + self.MAX_ALBUM_SIZE]
+                await self._post_album(link_msg, lines_chunk, link)
+                await menu_msg.delete()
+            raise events.StopPropagation
+        # Handle other callback data
+        await event.answer("Unrecognised response")
 
     async def handle_zip_callback(self, event: events.CallbackQuery.Event) -> None:
         query_data = event.query.data
