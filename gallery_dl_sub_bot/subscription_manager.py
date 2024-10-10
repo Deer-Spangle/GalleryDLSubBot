@@ -25,13 +25,21 @@ completed_download_count = Gauge(
     "gallerydlsubbot_total_completed_download_count",
     "Total number of completed downloads which have not been subscribed to",
 )
-subscription_count = Gauge(
-    "gallerydlsubbot_total_subscription_count",
-    "Total number of subscriptions in the subscription manager at the moment",
-)
 subscription_destination_count = Gauge(
     "gallerydlsubbot_total_subscription_destination_count",
     "Total number of subscription-destination pairs at the moment",
+)
+subscription_destination_count_active = Gauge(
+    "gallerydlsubbot_active_subscription_destination_count",
+    "Total number of non-paused subscription-destination pairs in the subscription manager at the moment",
+)
+unique_subscription_count = Gauge(
+    "gallerydlsubbot_unique_subscription_count",
+    "Total number of unique subscriptions in the subscription manager at the moment",
+)
+subscription_count_failing = Gauge(
+    "gallerydlsubbot_failing_subscription_count",
+    "Total number of subscriptions which have failed their most recent check",
 )
 unique_destination_count = Gauge(
     "gallerydlsubbot_unique_destination_count",
@@ -40,14 +48,6 @@ unique_destination_count = Gauge(
 unique_subscription_creator_count = Gauge(
     "gallerydlsubbot_unique_subscription_creator_count",
     "Total number of unique subscription creators"
-)
-subscription_destination_count_active = Gauge(
-    "gallerydlsubbot_active_subscription_count",
-    "Total number of non-paused subscription-destination pairs in the subscription manager at the moment",
-)
-subscription_count_failing = Gauge(
-    "gallerydlsubbot_failing_subscription_count",
-    "Total number of subscriptions which have failed their most recent check",
 )
 latest_check_if_updates_needed_time = Gauge(
     "gallerydlsubbot_latest_check_if_updates_needed_unixtime",
@@ -105,7 +105,7 @@ class SubscriptionManager:
         # Metrics
         subscription_watcher_running.set_function(lambda: int(self.running))
         completed_download_count.set_function(lambda: len(self.complete_downloads))
-        subscription_count.set_function(lambda: len(self.subscriptions))
+        unique_subscription_count.set_function(lambda: len(self.subscriptions))
         subscription_destination_count.set_function(
             lambda: len([d for s in self.subscriptions for d in s.destinations])
         )

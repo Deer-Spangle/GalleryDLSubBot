@@ -20,49 +20,24 @@ logger = logging.getLogger(__name__)
 
 PROM_PORT = 7168
 start_time = Gauge("gallerydlsubbot_start_unixtime", "Unix timestamp of the last time the bot was started")
-boop_usage_count = Counter(
-    "gallerydlsubbot_usage_boop_count",
-    "Count of how many times the boop function has been used",
+function_usage_count = Counter(
+    "gallerydlsubbot_function_usage_count",
+    "Count of how many times different functions of the bot have been used",
+    labelnames=["function"],
 )
-start_usage_count = Counter(
-    "gallerydlsubbot_start_usage_count",
-    "Count of how many times the start function has been used",
-)
-subscription_menu_summon_count = Counter(
-    "gallerydlsubbot_subscription_menu_summon_count",
-    "Count of how many times someone has summoned a subscription menu",
-)
-gallery_dl_update_menu_summon_count = Counter(
-    "gallerydlsubbot_gallery_dl_update_menu_summon_count",
-    "Count of how many times someone has summoned the menu to update gallery-dl",
-)
-zip_request_count = Counter(
-    "gallerydlsubbot_zip_download_request_count",
-    "Count of how many times someone requests a zip download",
-)
-subscribe_request_count = Counter(
-    "gallerydlsubbot_subscribe_request_count",
-    "Count of how many times someone requests to subscribe to a URL",
-)
-unsubscribe_request_count = Counter(
-    "gallerydlsubbot_unsubscribe_request_count",
-    "Count of how many times someone requests to unsubscribe from a URL",
-)
-pause_request_count = Counter(
-    "gallerydlsubbot_pause_request_count",
-    "Count of how many times someone requests to pause a subscription",
-)
-unpause_request_count = Counter(
-    "gallerydlsubbot_unpause_request_count",
-    "Count of how many times someone requests to unpause a subscription",
-)
+boop_usage_count = function_usage_count.labels(function="Boop")
+start_usage_count = function_usage_count.labels(function="Start menu")
+subscription_menu_summon_count = function_usage_count.labels(function="Summon subscription menu")
+gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
+zip_request_count = function_usage_count.labels(function="Zip request")
+subscribe_request_count = function_usage_count.labels(function="Subscription request")
+unsubscribe_request_count = function_usage_count.labele(function="Unsubscribe request")
+pause_request_count = function_usage_count.labels(function="Pause subscription")
+unpause_request_count = function_usage_count.labels(function="Resume subscription")
+url_request_message_count = function_usage_count.labels(function="URL request")
 failed_auth_attempts = Counter(
     "gallerydlsubbot_failed_auth_attempt_count",
     "Number of times someone has been denied auth for an action they attempted to do",
-)
-url_request_message_count = Counter(
-    "gallerydlsubbot_url_request_message_count",
-    "Number of times someone has sent a message to the bot with a link in it to download",
 )
 url_request_url_count = Counter(
     "gallerydlsubbot_url_request_url_count",
