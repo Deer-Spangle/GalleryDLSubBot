@@ -65,7 +65,7 @@ async def _check_sender(evt: events.CallbackQuery.Event, allowed_user_id: int) -
 class Bot:
     SUBS_PER_MENU_PAGE = 10
     MAX_ALBUM_SIZE = 10
-    MAX_OPTIONAL_ALBUMS_SIZE = 100
+    MAX_OFFER_EMBED = 100
 
     def __init__(self, config: dict) -> None:
         self.config = config
@@ -200,7 +200,7 @@ class Bot:
         if len(lines) == 0:
             return
         # If less than 10 things, just post an album
-        if len(lines) < self.MAX_ALBUM_SIZE:
+        if len(lines) <= self.MAX_ALBUM_SIZE:
             await self._post_album(event, lines, link)
             await self.sub_manager.delete_download(dl)
             return
@@ -210,7 +210,7 @@ class Bot:
             "user_id": str(event.sender_id),
         })
         # If it's not too many, offer to send anyway
-        if len(lines) < 100:
+        if len(lines) <= self.MAX_OFFER_EMBED:
             await event.reply(
                 f"Would you like me to send them as Telegram albums anyway?{hidden_link}",
                 parse_mode="html",
