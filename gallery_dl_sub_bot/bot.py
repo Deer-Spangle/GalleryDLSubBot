@@ -31,7 +31,7 @@ subscription_menu_summon_count = function_usage_count.labels(function="Summon su
 gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
 zip_request_count = function_usage_count.labels(function="Zip request")
 subscribe_request_count = function_usage_count.labels(function="Subscription request")
-unsubscribe_request_count = function_usage_count.labele(function="Unsubscribe request")
+unsubscribe_request_count = function_usage_count.labels(function="Unsubscribe request")
 pause_request_count = function_usage_count.labels(function="Pause subscription")
 unpause_request_count = function_usage_count.labels(function="Resume subscription")
 url_request_message_count = function_usage_count.labels(function="URL request")
