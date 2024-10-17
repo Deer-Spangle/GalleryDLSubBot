@@ -86,7 +86,7 @@ class Download:
 
     def list_files(self) -> list[str]:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
-        img_files = [f for f in all_files if not (f.endswith(".json") or f.endswith(".sqlite"))]
+        img_files = [f for f in all_files if os.path.isfile(f) and not (f.endswith(".json") or f.endswith(".sqlite"))]
         return sorted(img_files)
 
     async def send_new_items(self, new_items: list[str]) -> None:
