@@ -14,6 +14,7 @@ import aiofiles.os
 import aioshutil
 from prometheus_client import Counter
 
+from gallery_dl_sub_bot.link_fixer import link_to_str
 from gallery_dl_sub_bot.run_cmd import Command, run_cmd
 
 if typing.TYPE_CHECKING:
@@ -71,7 +72,7 @@ class Download:
 
     def __init__(
             self,
-            link: str,
+            link: str | list[str],
             path: str,
             last_check_date: datetime.datetime,
             sub_manager: "SubscriptionManager",
@@ -83,6 +84,10 @@ class Download:
         self.dl_manager = sub_manager.dl_manager
         self.zip_lock = asyncio.Lock()
         self.active_download: Optional[ActiveDownload] = None
+
+    @property
+    def link_str(self) -> str:
+        return link_to_str(self.link)
 
     def list_files(self) -> list[str]:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
@@ -165,7 +170,7 @@ class Subscription(Download):
 
     def __init__(
             self,
-            link: str,
+            link: str | list[str],
             path: str,
             last_check_date: datetime.datetime,
             sub_manager: "SubscriptionManager",
@@ -218,7 +223,7 @@ class Subscription(Download):
     async def send_new_items(self, new_items: list[str]) -> None:
         for new_item in new_items:
             file_handle = await self.client.upload_file(new_item)
-            caption = f"Update on feed: {html.escape(self.link)}"
+            caption = f"Update on feed: {html.escape(self.link_str)}"
             data_filename = f"{new_item}.json"
             caption_override = self.sub_manager.link_fixer.override_caption(self.link, data_filename)
             if caption_override:

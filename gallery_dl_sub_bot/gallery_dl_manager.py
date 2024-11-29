@@ -63,20 +63,23 @@ class GalleryDLManager:
         await self.check_install()
         return Command([self.GALLERY_DL_PKG, *args], lock=self.rwlock.reader_lock)
 
-    def dl_args(self, link: str, dl_path: str) -> list[str]:
+    def dl_args(self, link: str | list[str], dl_path: str) -> list[str]:
         archive_path = pathlib.Path(dl_path) / "archive.sqlite"
         args = []
         if self.config_path:
             args += ["-c", self.config_path]
+        link_args = link
+        if isinstance(link, str):
+            link_args = [link]
         args += [
             "--write-metadata",
             "--write-info-json",
             "-o", "output.skip=false",
             "-d", dl_path,
             "--download-archive", str(archive_path),
-            link,
+            *link_args,
         ]
         return args
 
-    async def download_cmd(self, link: str, dl_path: str) -> Command:
+    async def download_cmd(self, link: str | list[str], dl_path: str) -> Command:
         return await self.make_cmd(self.dl_args(link, dl_path))

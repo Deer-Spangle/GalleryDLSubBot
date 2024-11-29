@@ -10,6 +10,10 @@ from jinja2 import Environment, BaseLoader
 logger = logging.getLogger(__name__)
 
 
+def link_to_str(link: str | list[str]) -> str:
+    return link if isinstance(link, str) else " ".join(link)
+
+
 class LinkMatcher(ABC):
     def __init__(self, link_match: str | dict[str, str]) -> None:
         self.link_match = link_match
@@ -92,7 +96,9 @@ class LinkFixer:
                 link = fix.fix_link(link)
         return link
 
-    def override_caption(self, link: str, data_filename: str) -> Optional[str]:
+    def override_caption(self, link: str | list[str], data_filename: str) -> Optional[str]:
+        if not isinstance(link, str):
+            return None
         for override in self.caption_overrides:
             if override.matches_link(link):
                 try:

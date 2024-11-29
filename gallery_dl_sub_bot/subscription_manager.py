@@ -142,13 +142,13 @@ class SubscriptionManager:
 
     def download_for_link(self, link: str) -> Optional[Download]:
         for download in self.all_downloads:
-            if download.link == link:
+            if download.link == link or download.link_str == link:
                 return download
         return None
 
     def sub_for_link(self, link: str) -> Optional[Subscription]:
         for sub in self.subscriptions[:]:
-            if sub.link == link:
+            if sub.link == link or sub.link_str == link:
                 return sub
         return None
 
@@ -180,7 +180,7 @@ class SubscriptionManager:
             async with dl.zip_lock:
                 await aioshutil.rmtree(dl.path)
 
-    async def create_subscription(self, link: str, chat_id: int, creator_id: int, current_dl: Download) -> Subscription:
+    async def create_subscription(self, chat_id: int, creator_id: int, current_dl: Download) -> Subscription:
         # Create destination
         now_date = datetime.datetime.now(datetime.timezone.utc)
         dest = SubscriptionDestination(
@@ -208,7 +208,7 @@ class SubscriptionManager:
         await aioshutil.copytree(current_dl.path, new_path)
         # Otherwise create new subscription
         sub = Subscription(
-            link,
+            current_dl.link,
             new_path,
             now_date,
             self,

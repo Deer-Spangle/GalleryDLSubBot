@@ -3,6 +3,7 @@ import datetime
 import html
 import logging
 import re
+import shlex
 from typing import Optional
 
 from prometheus_client import Gauge, start_http_server, Counter, Histogram
@@ -12,8 +13,8 @@ from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.date_format import format_last_check
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
-from gallery_dl_sub_bot.link_fixer import LinkFixer
-from gallery_dl_sub_bot.subscription import SubscriptionDestination
+from gallery_dl_sub_bot.link_fixer import LinkFixer, link_to_str
+from gallery_dl_sub_bot.subscription import SubscriptionDestination, Download
 from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ boop_usage_count = function_usage_count.labels(function="Boop")
 start_usage_count = function_usage_count.labels(function="Start menu")
 subscription_menu_summon_count = function_usage_count.labels(function="Summon subscription menu")
 gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
+raw_download_usage_count = function_usage_count.labels(function="Raw download request")
 embed_request_count = function_usage_count.labels(function="Embed request")
 zip_request_count = function_usage_count.labels(function="Zip request")
 subscribe_request_count = function_usage_count.labels(function="Subscription request")
@@ -94,6 +96,7 @@ class Bot:
             self.update_gallery_dl,
             events.NewMessage(pattern="/update_gallery_dl", incoming=True)
         )
+        self.client.add_event_handler(self.raw_download, events.NewMessage(pattern="/raw", incoming=True))
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_embed_callback, events.CallbackQuery(pattern="embed:"))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
@@ -166,53 +169,34 @@ class Bot:
         await asyncio.gather(*(self._handle_link(link, event) for link in fixed_links))
         raise events.StopPropagation
 
-    async def _handle_link(self, link: str, event: events.NewMessage.Event) -> None:
-        evt = await event.reply(f"⏳ Downloading link: {html.escape(link)}", parse_mode="html", link_preview=False)
-        lines = []
-        last_progress_update = datetime.datetime.now(datetime.timezone.utc)
-        last_line_count: Optional[int] = None
-        with initial_download_time.time():
-            try:
-                dl = await self.sub_manager.create_download(link)
-                async for lines_batch in dl.download():
-                    lines += lines_batch
-                    now = datetime.datetime.now(datetime.timezone.utc)
-                    line_count = len(lines)
-                    if (now - last_progress_update) < datetime.timedelta(seconds=10) or line_count == last_line_count:
-                        continue
-                    await evt.edit(
-                        f"⏳ Downloading link: {html.escape(link)}\n(Found {line_count} images so far...)",
-                        parse_mode="html",
-                        link_preview=False,
-                    )
-                    last_progress_update = datetime.datetime.now(datetime.timezone.utc)
-                    last_line_count = line_count
-            except Exception as e:
-                logger.error(f"Failed to download link {link}", exc_info=e)
-                await event.reply(f"Failed to download link {html.escape(link)} :(")
-                await evt.delete()
-                raise e
-        # Post update on feed size
-        initial_download_size.observe(len(lines))
-        await event.reply(f"Found {len(lines)} images(s) in link: {html.escape(link)}", parse_mode="html")
-        await evt.delete()
+    async def _handle_link(
+            self,
+            link: str | list[str],
+            event: events.NewMessage.Event,
+            allow_auto_embed: bool = True,
+    ) -> None:
+        dl, lines = await self._download_link(link, event)
+        link_str = link_to_str(link)
         # If no images, stop now
         if len(lines) == 0:
             return
         # If less than 10 things, just post an album
-        if len(lines) <= self.MAX_ALBUM_SIZE:
+        if allow_auto_embed and len(lines) <= self.MAX_ALBUM_SIZE:
             await self._post_album(event, lines, link)
             await self.sub_manager.delete_download(dl)
             return
         # Otherwise post menus
         hidden_link = hidden_data({
-            "link": link,
+            "link": link_str,
             "user_id": str(event.sender_id),
         })
         # If it's not too many, offer to send anyway
         if len(lines) <= self.MAX_OFFER_EMBED:
+            offer_embed_msg = f"Would you like me to send them as Telegram albums anyway?{hidden_link}"
+            if not allow_auto_embed:
+                offer_embed_msg = f"Would you like me to send them as Telegram albums?{hidden_link}"
             await event.reply(
-                f"Would you like me to send them as Telegram albums anyway?{hidden_link}",
+                offer_embed_msg,
                 parse_mode="html",
                 buttons=[[
                     Button.inline("Yes", "embed:yes"),
@@ -229,15 +213,15 @@ class Bot:
             ]]
         )
         # Unless already subscribed, offer to subscribe
-        if self.sub_manager.sub_for_link_and_chat(link, event.chat_id):
+        if self.sub_manager.sub_for_link_and_chat(link_str, event.chat_id):
             await event.reply(
-                f"You are already subscribed to {html.escape(link)} in this chat.",
+                f"You are already subscribed to {html.escape(link_str)} in this chat.",
                 parse_mode="html",
                 link_preview=False,
             )
         else:
             await event.reply(
-                f"Would you like to subscribe to {html.escape(link)}?{hidden_link}",
+                f"Would you like to subscribe to {html.escape(link_str)}?{hidden_link}",
                 parse_mode="html",
                 buttons=[[
                     Button.inline("Yes, subscribe", "subscribe:yes"),
@@ -246,8 +230,49 @@ class Bot:
                 link_preview=False,
             )
 
+    async def _download_link(
+            self,
+            link: str | list[str],
+            request_evt: events.NewMessage.Event,
+    ) -> tuple[Download, list[str]]:
+        link_str = link_to_str(link)
+        evt = await request_evt.reply(
+            f"⏳ Downloading link: {html.escape(link_str)}",
+            parse_mode="html",
+            link_preview=False,
+        )
+        lines = []
+        last_progress_update = datetime.datetime.now(datetime.timezone.utc)
+        last_line_count: Optional[int] = None
+        with initial_download_time.time():
+            try:
+                dl = await self.sub_manager.create_download(link)
+                async for lines_batch in dl.download():
+                    lines += lines_batch
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    line_count = len(lines)
+                    if (now - last_progress_update) < datetime.timedelta(seconds=10) or line_count == last_line_count:
+                        continue
+                    await evt.edit(
+                        f"⏳ Downloading link: {html.escape(link_str)}\n(Found {line_count} images so far...)",
+                        parse_mode="html",
+                        link_preview=False,
+                    )
+                    last_progress_update = datetime.datetime.now(datetime.timezone.utc)
+                    last_line_count = line_count
+            except Exception as e:
+                logger.error(f"Failed to download link {link}", exc_info=e)
+                await request_evt.reply(f"Failed to download link {html.escape(link_str)} :(")
+                await evt.delete()
+                raise e
+        # Post update on feed size
+        initial_download_size.observe(len(lines))
+        await request_evt.reply(f"Found {len(lines)} images(s) in link: {html.escape(link_str)}", parse_mode="html")
+        await evt.delete()
+        return dl, lines
+
     async def _post_album(self, event: events.NewMessage.Event, lines: list[str], link: str) -> None:
-        caption = f"{html.escape(link)}"
+        caption = f"{html.escape(link_to_str(link))}"
         # Check for caption override
         data_file = f"{lines[0]}.json"
         caption_override = self.link_fixer.override_caption(link, data_file)
@@ -372,7 +397,7 @@ class Bot:
             subscribe_request_count.inc()
             await menu_msg.edit("⏳ Subscribing...", buttons=None)
             try:
-                await self.sub_manager.create_subscription(link, menu_msg.chat_id, user_id, dl)
+                await self.sub_manager.create_subscription(menu_msg.chat_id, user_id, dl)
             except Exception as e:
                 logger.error(f"Failed to subscribe to {link}", exc_info=e)
                 await menu_msg.edit(
@@ -425,7 +450,7 @@ class Bot:
             pagination_row.append(Button.inline("➡️Next", f"subs_offset:{next_offset}"))
         # Construct button list
         return [
-                [Button.inline(f"{n}) {sub.subscription.link}", f"subs_menu:{n}")]
+                [Button.inline(f"{n}) {sub.subscription.link_str}", f"subs_menu:{n}")]
                 for n, sub in enumerate(subs_page, start=1+offset)
             ] + [
             pagination_row
@@ -445,7 +470,7 @@ class Bot:
                 suffix = " (failing checks)"
             if sub.paused:
                 suffix = " (paused)"
-            lines.append(f"{bpt} {n}) {html.escape(sub.subscription.link)}{suffix}")
+            lines.append(f"{bpt} {n}) {html.escape(sub.subscription.link_str)}{suffix}")
         menu_text += "\n".join(lines)
         return menu_text
 
@@ -510,11 +535,11 @@ class Bot:
         sub = sub_dest.subscription
         # Assemble menu data
         msg_data = {
-            "link": sub.link,
+            "link": sub.link_str,
             "user_id": user_id,
         }
         # Send menu
-        view_sub_lines = [f"{hidden_data(msg_data)}Viewing subscription: {html.escape(sub.link)}"]
+        view_sub_lines = [f"{hidden_data(msg_data)}Viewing subscription: {html.escape(sub.link_str)}"]
         view_sub_lines += [f"Created: {format_last_check(sub_dest.created_date)}"]
         if sub.failed_checks > 0:
             view_sub_lines += [f"Failed last {sub.failed_checks} checks"]
@@ -577,7 +602,7 @@ class Bot:
         # Parse menu data
         menu_msg = await event.get_message()
         menu_data = parse_hidden_data(menu_msg)
-        link = menu_data["link"]
+        link_str = menu_data["link"]
         user_id = int(menu_data["user_id"])
         # Check button is pressed by user who summoned the menu
         await _check_sender(event, user_id)
@@ -593,11 +618,11 @@ class Bot:
             raise events.StopPropagation
         # Pause subscription
         chat_id = event.chat_id
-        await self.sub_manager.pause_subscription(link, chat_id, pause_sub)
+        await self.sub_manager.pause_subscription(link_str, chat_id, pause_sub)
         # Refresh menu menu
         pause_verb = "Paused" if pause_sub else "Resumed"
         await menu_msg.edit(
-            f"{pause_verb} subscription to {html.escape(link)}",
+            f"{pause_verb} subscription to {html.escape(link_str)}",
             parse_mode="html",
             link_preview=False,
             buttons=None,
@@ -694,4 +719,25 @@ class Bot:
         new_version = await self.dl_manager.get_tool_version()
         await event.reply(f"Updated gallery-dl to {new_version}")
         await evt.delete()
+        raise events.StopPropagation
+
+    async def raw_download(self, event: events.NewMessage.Event) -> None:
+        raw_download_usage_count.inc()
+        user_id = event.sender_id
+        logger.info("Raw download request from %s", user_id)
+        # Check if they are authorised to use the bot
+        if not self.auth_manager.user_is_trusted(user_id):
+            failed_auth_attempts.inc()
+            logger.info("Unauthorised user has tried to run a raw download: %s", user_id)
+            await event.reply("Apologies, you are not authorised to operate this bot")
+            raise events.StopPropagation
+        # Parse the message
+        message_text = event.message.text
+        message_split = shlex.split(message_text)
+        dl_args = message_split[1:]
+        if not dl_args:
+            await event.reply("Please specify a link (and potentially arguments) for raw download")
+            raise events.StopPropagation
+        # Run the download
+        await self._handle_link(dl_args, event, allow_auto_embed=False)
         raise events.StopPropagation
