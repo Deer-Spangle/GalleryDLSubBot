@@ -1,9 +1,13 @@
 import datetime
+import json
 import logging
 import pathlib
+import uuid
 from typing import Optional
 
+import aiofiles
 import aiorwlock
+import deepmerge
 
 from gallery_dl_sub_bot.run_cmd import run_cmd, Command
 
@@ -59,6 +63,26 @@ class GalleryDLManager:
         if self.last_update is None:
             await self.install_tool()
 
+    async def create_merged_config_file(self, new_config: dict) -> str:
+        with open(self.config_path, "r") as f:
+            base_config = json.load(f)
+        merger = deepmerge.Merger(
+            [
+                (list, "override"),
+                (dict, "merge"),
+                (set, "override")
+            ],
+            ["override"],
+            ["override"],
+        )
+        merged = merger.merge(base_config, new_config)
+        config_dir = "store/configs"
+        await aiofiles.os.makedirs(config_dir, exist_ok=True)
+        config_filename = f"{config_dir}/{uuid.uuid4()}.json"
+        async with aiofiles.open(config_filename, "w") as f:
+            await f.write(json.dumps(merged, indent=2))
+        return config_filename
+
     async def make_cmd(self, args: list[str]) -> Command:
         await self.check_install()
         return Command([self.GALLERY_DL_PKG, *args], lock=self.rwlock.reader_lock)
@@ -67,7 +91,8 @@ class GalleryDLManager:
         archive_path = pathlib.Path(dl_path) / "archive.sqlite"
         args = []
         if self.config_path:
-            args += ["-c", self.config_path]
+            if isinstance(link, str) or "-c" not in link:
+                args += ["-c", self.config_path]
         link_args = link
         if isinstance(link, str):
             link_args = [link]

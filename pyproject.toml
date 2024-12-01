@@ -17,6 +17,7 @@ jinja2 = "^3.1.4"
 aiofiles = "^24.1.0"
 aiorwlock = "^1.4.0"
 prometheus-client = "^0.21.0"
+deepmerge = "^2.0"
 
 
 [build-system]

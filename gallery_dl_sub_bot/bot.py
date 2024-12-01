@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import html
+import json
 import logging
 import re
 import shlex
@@ -738,6 +739,20 @@ class Bot:
         if not dl_args:
             await event.reply("Please specify a link (and potentially arguments) for raw download")
             raise events.StopPropagation
+        # Check if one of these args is a json dict
+        dl_config = None
+        for i, dl_arg in enumerate(dl_args[:]):
+            try:
+                dl_json = json.loads(dl_arg)
+                if isinstance(dl_json, dict):
+                    dl_config = dl_json
+                    dl_args = dl_args[:i] + dl_args[i+1:]
+            except json.decoder.JSONDecodeError:
+                pass
+        # If dl config was set, fetch base config and merge with it
+        if dl_config is not None:
+            config_path = await self.dl_manager.create_merged_config_file(dl_config)
+            dl_args += ["-c", config_path]
         # Run the download
         await self._handle_link(dl_args, event, allow_auto_embed=False)
         raise events.StopPropagation
