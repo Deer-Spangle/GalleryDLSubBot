@@ -32,6 +32,7 @@ start_usage_count = function_usage_count.labels(function="Start menu")
 subscription_menu_summon_count = function_usage_count.labels(function="Summon subscription menu")
 gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
 raw_download_usage_count = function_usage_count.labels(function="Raw download request")
+unknown_command_usage_count = function_usage_count.labels(function="Unknown command")
 embed_request_count = function_usage_count.labels(function="Embed request")
 zip_request_count = function_usage_count.labels(function="Zip request")
 subscribe_request_count = function_usage_count.labels(function="Subscription request")
@@ -98,6 +99,7 @@ class Bot:
             events.NewMessage(pattern="/update_gallery_dl", incoming=True)
         )
         self.client.add_event_handler(self.raw_download, events.NewMessage(pattern="/raw", incoming=True))
+        self.client.add_event_handler(self.unknown_command, events.NewMessage(pattern="/", incoming=True))
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_embed_callback, events.CallbackQuery(pattern="embed:"))
         self.client.add_event_handler(self.handle_zip_callback, events.CallbackQuery(pattern="dl_zip:"))
@@ -756,3 +758,11 @@ class Bot:
         # Run the download
         await self._handle_link(dl_args, event, allow_auto_embed=False)
         raise events.StopPropagation
+
+    # noinspection PyMethodMayBeStatic
+    async def unknown_command(self, event: events.NewMessage.Event) -> None:
+        # Only trigger in private message
+        if event.chat_id == event.sender_id:
+            unknown_command_usage_count.inc()
+            await event.reply("Sorry, I do not understand that command")
+            raise events.StopPropagation
