@@ -5,8 +5,9 @@ import json
 import logging
 import re
 import shlex
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 
+import telethon
 from prometheus_client import Gauge, start_http_server, Counter, Histogram
 from telethon import TelegramClient, events, Button
 
@@ -425,31 +426,63 @@ class Bot:
         if len(sub_dests) == 0:
             await event.reply("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
-        await event.reply(
-            self._list_subscriptions_menu_text(sub_dests, 0, user_id),
-            parse_mode="html",
-            link_preview=False,
-            buttons=self._list_subscriptions_menu_buttons(sub_dests, 0),
-        )
+        async def post_cmd(text: str, buttons: Optional[list[list[Button]]]) -> None:
+            await event.reply(
+                text,
+                parse_mode="html",
+                link_preview=False,
+                buttons=buttons,
+            )
+        await self._post_subscription_menu(post_cmd, sub_dests, 0, user_id)
         raise events.StopPropagation
 
-    def _list_subscriptions_menu_buttons(self, subs: list[SubscriptionDestination], offset: int) -> list[list[Button]]:
+    async def _post_subscription_menu(
+            self,
+            post_cmd: Callable[[str, Optional[list[list[Button]]]], Awaitable[None]],
+            sub_dests: list[SubscriptionDestination],
+            offset: int,
+            user_id: int,
+    ):
+        page_size = self.SUBS_PER_MENU_PAGE
+        while page_size <= 0:
+            try:
+                await post_cmd(
+                    self._list_subscriptions_menu_text(sub_dests, page_size, offset, user_id),
+                    self._list_subscriptions_menu_buttons(sub_dests, page_size, offset),
+                )
+                return
+            except telethon.errors.rpcerrorlist.MessageTooLongError:
+                page_size -= 1
+                logger.warning("Subscription menu too long to post, changing page size down to %s", page_size)
+        logger.error("Completely failed to post subscription menu, single item too long")
+        await post_cmd(
+            "I can't post your subscription list, as an item is too long to fit in a Telegram message",
+            None,
+        )
+
+    # noinspection PyMethodMayBeStatic
+    def _list_subscriptions_menu_buttons(
+            self,
+            subs: list[SubscriptionDestination],
+            page_size: int,
+            offset: int,
+    ) -> list[list[Button]]:
         # Cap offset
         if offset < 0:
             offset = 0
         if offset >= len(subs):
             offset = len(subs) - 1
         # Get the page's subscription list
-        subs_page = subs[offset:offset+self.SUBS_PER_MENU_PAGE]
+        subs_page = subs[offset:offset+page_size]
         # Construct the pagination buttons
         has_prev = offset > 0
-        has_next = len(subs) > self.SUBS_PER_MENU_PAGE + offset
+        has_next = len(subs) > page_size + offset
         pagination_row = []
         if has_prev:
-            prev_offset = max(offset-self.SUBS_PER_MENU_PAGE, 0)
+            prev_offset = max(offset-page_size, 0)
             pagination_row.append(Button.inline("⬅️Prev", f"subs_offset:{prev_offset}"))
         if has_next:
-            next_offset = offset + self.SUBS_PER_MENU_PAGE
+            next_offset = offset + page_size
             pagination_row.append(Button.inline("➡️Next", f"subs_offset:{next_offset}"))
         # Construct button list
         return [
@@ -459,14 +492,21 @@ class Bot:
             pagination_row
         ]
 
-    def _list_subscriptions_menu_text(self, subs: list[SubscriptionDestination], offset: int, user_id: int) -> str:
+    # noinspection PyMethodMayBeStatic
+    def _list_subscriptions_menu_text(
+            self,
+            subs: list[SubscriptionDestination],
+            page_size: int,
+            offset: int,
+            user_id: int,
+    ) -> str:
         menu_data = hidden_data({"offset": str(offset), "user_id": str(user_id)})
         menu_text = f"{menu_data}You have {len(subs)} subscriptions in this chat:\n"
         lines = []
         for n, sub in enumerate(subs, start=1):
             bpt = "-"
             idx = n - 1
-            if offset <= idx < offset + self.SUBS_PER_MENU_PAGE:
+            if offset <= idx < offset + page_size:
                 bpt = "*"
             suffix = ""
             if sub.subscription.failed_checks > 0:
@@ -496,12 +536,14 @@ class Bot:
             await menu_msg.edit("You have no subscriptions in this chat. Send a link to create one")
             raise events.StopPropagation
         # Send menu
-        await menu_msg.edit(
-            self._list_subscriptions_menu_text(sub_dests, offset, user_id),
-            parse_mode="html",
-            link_preview=False,
-            buttons=self._list_subscriptions_menu_buttons(sub_dests, offset),
-        )
+        async def post_cmd(text: str, buttons: Optional[list[list[Button]]]) -> None:
+            await menu_msg.edit(
+                text,
+                parse_mode="html",
+                link_preview=False,
+                buttons=buttons,
+            )
+        await self._post_subscription_menu(post_cmd, sub_dests, offset, user_id)
         raise events.StopPropagation
 
     async def view_subscription_menu(self, event: events.CallbackQuery.Event) -> None:
@@ -526,12 +568,15 @@ class Bot:
         # Check subscription index is valid
         if 0 > view_sub_idx or len(sub_dests) <= view_sub_idx:
             await event.answer("Subscription index not valid")
-            await menu_msg.edit(
-                self._list_subscriptions_menu_text(sub_dests, offset, user_id),
-                parse_mode="html",
-                link_preview=False,
-                buttons=self._list_subscriptions_menu_buttons(sub_dests, offset),
-            )
+            async def post_cmd(text: str, buttons: Optional[list[list[Button]]]) -> None:
+                await menu_msg.edit(
+                    text,
+                    parse_mode="html",
+                    link_preview=False,
+                    buttons=buttons,
+                )
+
+            await self._post_subscription_menu(post_cmd, sub_dests, offset, user_id)
             raise events.StopPropagation
         # Get subscription and destination
         sub_dest = sub_dests[view_sub_idx]
