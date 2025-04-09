@@ -511,6 +511,8 @@ class Bot:
     ) -> str:
         menu_data = hidden_data({"offset": str(offset), "user_id": str(user_id)})
         menu_text = f"{menu_data}You have {len(subs)} subscriptions in this chat:\n"
+        if display_one_page:
+            menu_text += "(Displaying 1 page only, due to message length limits)\n"
         lines = []
         for n, sub in enumerate(subs, start=1):
             bpt = "-"
