@@ -444,7 +444,7 @@ class Bot:
             user_id: int,
     ):
         page_size = self.SUBS_PER_MENU_PAGE
-        while page_size <= 0:
+        while page_size > 0:
             try:
                 await post_cmd(
                     self._list_subscriptions_menu_text(sub_dests, page_size, offset, user_id),
