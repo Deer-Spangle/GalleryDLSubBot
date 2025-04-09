@@ -453,7 +453,7 @@ class Bot:
                 )
                 return
             except telethon.errors.rpcerrorlist.MessageTooLongError:
-                if display_one_page:
+                if not display_one_page:
                     display_one_page = True
                     logger.warning("Full subscription menu too long to post, only displaying 1 page")
                 else:
