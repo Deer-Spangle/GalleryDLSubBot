@@ -443,17 +443,25 @@ class Bot:
             offset: int,
             user_id: int,
     ):
+        display_one_page = False
         page_size = self.SUBS_PER_MENU_PAGE
         while page_size > 0:
             try:
                 await post_cmd(
-                    self._list_subscriptions_menu_text(sub_dests, page_size, offset, user_id),
+                    self._list_subscriptions_menu_text(sub_dests, page_size, offset, display_one_page, user_id),
                     self._list_subscriptions_menu_buttons(sub_dests, page_size, offset),
                 )
                 return
             except telethon.errors.rpcerrorlist.MessageTooLongError:
-                page_size -= 1
-                logger.warning("Subscription menu too long to post, changing page size down to %s", page_size)
+                if display_one_page:
+                    display_one_page = False
+                    logger.warning("Full subscription menu too long to post, only displaying 1 page")
+                else:
+                    page_size -= 1
+                    logger.warning(
+                        "Subscription menu page too long to post, changing page size down to %s",
+                        page_size,
+                    )
         logger.error("Completely failed to post subscription menu, single item too long")
         await post_cmd(
             "I can't post your subscription list, as an item is too long to fit in a Telegram message",
@@ -498,6 +506,7 @@ class Bot:
             subs: list[SubscriptionDestination],
             page_size: int,
             offset: int,
+            display_one_page: bool,
             user_id: int,
     ) -> str:
         menu_data = hidden_data({"offset": str(offset), "user_id": str(user_id)})
@@ -508,6 +517,8 @@ class Bot:
             idx = n - 1
             if offset <= idx < offset + page_size:
                 bpt = "*"
+            elif display_one_page:
+                continue
             suffix = ""
             if sub.subscription.failed_checks > 0:
                 suffix = " (failing checks)"
