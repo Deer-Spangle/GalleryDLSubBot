@@ -77,6 +77,13 @@ class Download:
             last_check_date: datetime.datetime,
             sub_manager: "SubscriptionManager",
     ) -> None:
+        """
+        Creates a Download object, which describes a link to be downloaded
+        :param link: A link to a feed as a string, or a list containing a link and additional arguments to gallery-dl
+        :param path: The path which the feed was downloaded into
+        :param last_check_date: The last date that the download was checked for completeness
+        :param sub_manager: Reference to the subscription manager
+        """
         self.link = link
         self.path = path
         self.last_check_date = last_check_date
