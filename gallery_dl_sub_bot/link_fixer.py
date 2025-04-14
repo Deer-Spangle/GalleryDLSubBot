@@ -14,6 +14,14 @@ def link_to_str(link: str | list[str]) -> str:
     return link if isinstance(link, str) else " ".join(link)
 
 
+def find_first_link_in_list(link_args: list[str]) -> Optional[str]:
+    for link in link_args:
+        parsed = urllib.parse.urlparse(link)
+        if parsed.netloc:
+            return link
+    return None
+
+
 class LinkMatcher(ABC):
     """
     A LinkMatcher is a  pattern which checks whether a link matches a certain configuration.
@@ -114,12 +122,15 @@ class LinkFixer:
         return link
 
     def override_caption(self, link: str | list[str], data_filename: str) -> Optional[str]:
-        if isinstance(link, list) and len(link) == 1:
-            link = link[0]
-        if not isinstance(link, str):
+        link_str = None
+        if isinstance(link, str):
+            link_str = link
+        if isinstance(link, list):
+            link_str = find_first_link_in_list(link)
+        if link_str is None:
             return None
         for override in self.caption_overrides:
-            if override.matches_link(link):
+            if override.matches_link(link_str):
                 try:
                     with open(data_filename, "r") as f:
                         data = json.load(f)
