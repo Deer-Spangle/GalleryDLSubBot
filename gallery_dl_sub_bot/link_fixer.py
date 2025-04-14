@@ -114,6 +114,8 @@ class LinkFixer:
         return link
 
     def override_caption(self, link: str | list[str], data_filename: str) -> Optional[str]:
+        if isinstance(link, list) and len(link) == 1:
+            link = link[0]
         if not isinstance(link, str):
             return None
         for override in self.caption_overrides:
