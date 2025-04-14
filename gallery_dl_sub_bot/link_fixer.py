@@ -15,6 +15,10 @@ def link_to_str(link: str | list[str]) -> str:
 
 
 class LinkMatcher(ABC):
+    """
+    A LinkMatcher is a  pattern which checks whether a link matches a certain configuration.
+    Often, that is the domain (Or "netloc") of a link. But other attributes of parsed URLs can also be matched.
+    """
     def __init__(self, link_match: str | dict[str, str]) -> None:
         self.link_match = link_match
 
@@ -29,6 +33,9 @@ class LinkMatcher(ABC):
 
 
 class LinkFix(LinkMatcher):
+    """
+    A LinkFix entry defines how to clean a link, using configuration from a dictionary
+    """
     def __init__(self, link_match: str | dict[str, str], link_target: str | dict[str, str]) -> None:
         super().__init__(link_match)
         self.link_target = link_target
@@ -45,6 +52,11 @@ class LinkFix(LinkMatcher):
 
 
 class CaptionOverride(LinkMatcher):
+    """
+    A CaptionOverride entry will, if it matches a given subscription link, parse the gallery-dl JSON entry for the item
+    and construct a replacement caption using that data.
+    Often this is to facilitate having a link to the specific post, rather than a caption describing the subscription.
+    """
     def __init__(self, link_match: str | dict[str, str], caption_template: str) -> None:
         super().__init__(link_match)
         self.caption_template = caption_template
@@ -56,6 +68,11 @@ class CaptionOverride(LinkMatcher):
 
 
 class LinkFixer:
+    """
+    The LinkFixer contains all the configuration for all subscription link cleaning, and post caption overrides.
+    It loads them from the yaml and parses them, and manages finding matching link cleaners and caption overriders for
+    given links.
+    """
     def __init__(self):
         self.fixes: list[LinkFix] = []
         self.caption_overrides: list[CaptionOverride] = []
