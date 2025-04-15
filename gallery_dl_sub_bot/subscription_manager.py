@@ -273,6 +273,7 @@ class SubscriptionManager:
                 with subscription_check_time.time():
                     async for line_batch in sub.download():
                         new_items += line_batch
+                        logger.debug("Got new batch of %s lines in %s check", len(line_batch), sub.link)
             except Exception as e:
                 logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
                 sub.failed_checks += 1
