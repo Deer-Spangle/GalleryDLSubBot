@@ -60,7 +60,7 @@ async def iter_stream(
             line_bytes = await asyncio.wait_for(stream.readline(), timeout)
             if line_bytes == b"":
                 # EOF reached
-                logger.debug("Stream ended", )
+                logger.debug("Stream ended")
                 break
             line = line_bytes.decode().rstrip("\n")
             logger.info(prefix + line)
