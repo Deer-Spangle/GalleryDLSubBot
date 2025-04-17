@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from asyncio import StreamReader
 from asyncio.subprocess import Process
 from contextlib import asynccontextmanager
@@ -31,14 +32,21 @@ async def log_stream(stream: StreamReader, timeout: int = DEFAULT_TIMEOUT, prefi
         prefix = ""
     else:
         prefix += ": "
+    remaining_timeout = timeout
     try:
         while True:
-            line_bytes = await asyncio.wait_for(stream.readline(), timeout)
+            start = time.time()
+            line_bytes = await asyncio.wait_for(stream.readline(), remaining_timeout)
             if line_bytes == b"":
                 # EOF reached
                 logger.debug("Stream ended %s", prefix)
                 break
             line = line_bytes.decode().rstrip("\n")
+            if line == "":
+                remaining_timeout = remaining_timeout - (time.time() - start)
+                logger.debug("Empty line, decrementing timeout. New timeout: %ss", remaining_timeout)
+            else:
+                remaining_timeout = timeout
             logger.info(prefix + line)
             lines.append(line)
     except asyncio.TimeoutError:
@@ -55,14 +63,21 @@ async def iter_stream(
         prefix = ""
     else:
         prefix += ": "
+    remaining_timeout = timeout
     try:
         while True:
-            line_bytes = await asyncio.wait_for(stream.readline(), timeout)
+            start = time.time()
+            line_bytes = await asyncio.wait_for(stream.readline(), remaining_timeout)
             if line_bytes == b"":
                 # EOF reached
                 logger.debug("Stream ended")
                 break
             line = line_bytes.decode().rstrip("\n")
+            if line == "":
+                remaining_timeout = remaining_timeout - (time.time() - start)
+                logger.debug("Empty line, decrementing timeout. New timeout: %ss", remaining_timeout)
+            else:
+                remaining_timeout = timeout
             logger.info(prefix + line)
             yield stream, line
     except asyncio.TimeoutError as e:
