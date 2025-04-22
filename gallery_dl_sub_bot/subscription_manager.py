@@ -269,10 +269,19 @@ class SubscriptionManager:
             latest_subscription_checked_time.set_to_current_time()
             # Try and fetch update
             new_items = []
+            zero_batches = 0
             try:
                 with subscription_check_time.time():
                     async for line_batch in sub.download():
                         new_items += line_batch
+                        if len(line_batch) == 0:
+                            zero_batches += 1
+                            if zero_batches > 10:
+                                logger.warning(
+                                    "Got 10 empty batches in a row for subscription %s, stopping here",
+                                    sub.link
+                                )
+                                break
                         logger.info("Got new batch of %s lines in %s check", len(line_batch), sub.link)
             except Exception as e:
                 logger.warning("Failed to check subscription to %s", sub.link, exc_info=e)
