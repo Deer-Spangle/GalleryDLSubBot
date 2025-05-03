@@ -14,6 +14,7 @@ import aiofiles.os
 import aioshutil
 from prometheus_client import Counter
 
+from gallery_dl_sub_bot.image_conversion import convert_if_webp
 from gallery_dl_sub_bot.link_fixer import link_to_str
 from gallery_dl_sub_bot.run_cmd import Command, run_cmd
 
@@ -229,6 +230,7 @@ class Subscription(Download):
 
     async def send_new_items(self, new_items: list[str]) -> None:
         for new_item in new_items:
+            new_item = convert_if_webp(new_item)
             file_handle = await self.client.upload_file(new_item)
             caption = f"Update on feed: {html.escape(self.link_str)}"
             data_filename = f"{new_item}.json"

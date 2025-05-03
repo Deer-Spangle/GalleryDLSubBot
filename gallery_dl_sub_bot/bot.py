@@ -15,6 +15,7 @@ from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.date_format import format_last_check
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
+from gallery_dl_sub_bot.image_conversion import convert_if_webp
 from gallery_dl_sub_bot.link_fixer import LinkFixer, link_to_str
 from gallery_dl_sub_bot.subscription import SubscriptionDestination, Download
 from gallery_dl_sub_bot.subscription_manager import SubscriptionManager
@@ -282,8 +283,12 @@ class Bot:
         caption_override = self.link_fixer.override_caption(link, data_file)
         if caption_override:
             caption = caption_override
+        # Convert any webp to png
+        conv_lines = []
+        for image in lines:
+            conv_lines.append(convert_if_webp(image))
         # Post the album
-        await event.reply(caption, parse_mode="html", file=lines)
+        await event.reply(caption, parse_mode="html", file=conv_lines)
         return
 
     async def handle_embed_callback(self, event: events.CallbackQuery.Event) -> None:
