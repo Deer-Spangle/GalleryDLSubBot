@@ -46,16 +46,23 @@ class ActiveDownload:
 
     async def run(self) -> AsyncIterator[list[str]]:
         yield self.lines_at_start
+        # Create the download
         self.command = await self.dl.dl_manager.download_cmd(self.dl.link, self.dl.path)
+        # Watch the download progress
         try:
             async for line in self.command.run_iter():
                 self.lines_so_far.append(line)
                 yield [line]
         except Exception as e:
             logger.warning("Failed to run active download: ", exc_info=e)
-        await self.dl.send_new_items(self.lines_so_far)
-        self.complete = True
-        self.dl.sub_manager.save()
+        # Send the updates out to any subscribers
+        try:
+            await self.dl.send_new_items(self.lines_so_far)
+        except Exception as e:
+            logger.warning("Failed to send %s new items for link: %s", len(self.lines_so_far), self.dl.link, exc_info=e)
+        finally:
+            self.complete = True
+            self.dl.sub_manager.save()
 
     async def track(self) -> AsyncIterator[list[str]]:
         yield self.lines_at_start
