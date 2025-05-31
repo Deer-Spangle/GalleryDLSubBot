@@ -121,16 +121,11 @@ class SubscriptionManager:
         subscription_count_failing.set_function(
             lambda: len([s for s in self.subscriptions if s.failed_checks >= 1])
         )
-        subscription_total_items_stored.set_function(self.count_total_files_stored)
+        subscription_total_items_stored.set_function(lambda: sum(s.num_files for s in self.subscriptions))
 
     @property
     def all_downloads(self) -> list[Download]:
         return self.subscriptions[:] + self.complete_downloads[:]
-
-    def count_total_files_stored(self) -> int:
-        return sum(
-            len(s.list_files()) for s in self.subscriptions
-        )
 
     def save(self) -> None:
         config_data = {

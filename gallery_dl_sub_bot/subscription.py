@@ -62,6 +62,7 @@ class ActiveDownload:
             logger.warning("Failed to send %s new items for link: %s", len(self.lines_so_far), self.dl.link, exc_info=e)
         finally:
             self.complete = True
+            self.dl.update_num_files()
             self.dl.sub_manager.save()
 
     async def track(self) -> AsyncIterator[list[str]]:
@@ -99,6 +100,7 @@ class Download:
         self.dl_manager = sub_manager.dl_manager
         self.zip_lock = asyncio.Lock()
         self.active_download: Optional[ActiveDownload] = None
+        self.num_files = len(self.list_files())
 
     @property
     def link_str(self) -> str:
@@ -108,6 +110,10 @@ class Download:
         all_files = glob.glob(self.path + '/**/*.*', recursive=True)
         img_files = [f for f in all_files if os.path.isfile(f) and not (f.endswith(".json") or f.endswith(".sqlite"))]
         return sorted(img_files)
+
+    def update_num_files(self) -> int:
+        self.num_files = len(self.list_files())
+        return self.num_files
 
     async def send_new_items(self, new_items: list[str]) -> None:
         pass
