@@ -848,7 +848,7 @@ class Bot:
             input_photo = telethon.utils.get_input_photo(photo)
             input_photo.spoiler = True
             logger.info("Sending spoilered photo to user %s", user_id)
-            await event.reply(caption, photo=input_photo)
+            await event.reply(caption, file=input_photo)
             raise events.StopPropagation
         # Fetch the document from that message, if applicable, and repost it as spoilered document
         document = reply_to.document
@@ -856,7 +856,7 @@ class Bot:
             input_document = telethon.utils.get_input_document(document)
             input_document.spoiler = True
             logger.info("Sending spoilered document to user %s", user_id)
-            await event.reply(caption, document=input_document)
+            await event.reply(caption, file=input_document)
             raise events.StopPropagation
         # No media on the message, return an error message
         logger.info("User replied to a text only message asking for spoiler")
