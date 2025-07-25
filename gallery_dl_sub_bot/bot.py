@@ -11,6 +11,7 @@ import telethon
 from prometheus_client import Gauge, start_http_server, Counter, Histogram
 from telethon import TelegramClient, events, Button
 import telethon.utils
+from telethon.tl.types import InputMediaPhoto, InputMediaDocument
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.date_format import format_last_check
@@ -845,18 +846,18 @@ class Bot:
         # Fetch the photo from that message, if applicable, and repost it as spoilered photo
         photo = reply_to.photo
         if photo is not None:
-            input_photo = telethon.utils.get_input_photo(photo)
-            input_photo.spoiler = True
+            input_photo = (telethon.utils.get_input_photo(photo))
+            input_media = InputMediaPhoto(input_photo, spoiler=True)
             logger.info("Sending spoilered photo to user %s", user_id)
-            await event.reply(caption, file=input_photo)
+            await event.reply(caption, file=input_media)
             raise events.StopPropagation
         # Fetch the document from that message, if applicable, and repost it as spoilered document
         document = reply_to.document
         if document is None:
             input_document = telethon.utils.get_input_document(document)
-            input_document.spoiler = True
+            input_media = InputMediaDocument(input_document, spoiler=True)
             logger.info("Sending spoilered document to user %s", user_id)
-            await event.reply(caption, file=input_document)
+            await event.reply(caption, file=input_media)
             raise events.StopPropagation
         # No media on the message, return an error message
         logger.info("User replied to a text only message asking for spoiler")
