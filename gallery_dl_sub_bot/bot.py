@@ -14,6 +14,7 @@ import telethon.utils
 from telethon.tl.types import InputMediaPhoto, InputMediaDocument
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
+from gallery_dl_sub_bot.config import BotConfig
 from gallery_dl_sub_bot.date_format import format_last_check
 from gallery_dl_sub_bot.gallery_dl_manager import GalleryDLManager
 from gallery_dl_sub_bot.hidden_data import parse_hidden_data, hidden_data
@@ -76,13 +77,13 @@ class Bot:
     MAX_ALBUM_SIZE = 10
     MAX_OFFER_EMBED = 100
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: BotConfig) -> None:
         self.config = config
         session_name = "gallery_dl_sub_bot"
-        if suffix := self.config["telegram"].get("session_suffix"):
+        if suffix := self.config.telegram.session_suffix:
             session_name += f"__{suffix}"
         self.client = TelegramClient(
-            session_name, self.config["telegram"]["api_id"], self.config["telegram"]["api_hash"]
+            session_name, self.config.telegram.api_id, self.config.telegram.api_hash
         )
         self.dl_manager = GalleryDLManager("config_gallery_dl.json")
         self.auth_manager = AuthManager("trusted_users.yaml")
@@ -91,7 +92,7 @@ class Bot:
 
     def run(self) -> None:
         start_time.set_to_current_time()
-        self.client.start(bot_token=self.config["telegram"]["bot_token"])
+        self.client.start(bot_token=self.config.telegram.bot_token)
         # Register functions
         self.client.add_event_handler(self.start, events.NewMessage(pattern="/start", incoming=True))
         self.client.add_event_handler(self.boop, events.NewMessage(pattern="/beep", incoming=True))
@@ -120,7 +121,8 @@ class Bot:
         # Start listening
         try:
             # Start subscription manager
-            self.sub_manager.start()
+            if self.config.enable_subscriptions:
+                self.sub_manager.start()
             # Start bot listening
             logger.info("Starting bot")
             self.client.run_until_disconnected()

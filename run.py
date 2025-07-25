@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import sys
@@ -7,6 +6,7 @@ from logging.handlers import TimedRotatingFileHandler
 import click
 
 from gallery_dl_sub_bot.bot import Bot
+from gallery_dl_sub_bot.config import BotConfig
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -29,15 +29,17 @@ def setup_logging(log_level: str = "INFO") -> None:
 
 @click.command()
 @click.option("--log-level", type=str, help="Log level for the logger", default="INFO")
+@click.option("--subscriptions/--no-subscriptions", default=True)
 def main(
         log_level: str,
+        subscriptions: bool,
 ):
     setup_logging(log_level)
+    config = BotConfig.load_config("config.json")
+    config.enable_subscriptions = subscriptions
     bot = Bot(config)
     bot.run()
 
 
 if __name__ == '__main__':
-    with open("config.json", "r") as f:
-        config = json.load(f)
     main()
