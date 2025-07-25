@@ -10,6 +10,7 @@ from typing import Optional, Callable, Awaitable
 import telethon
 from prometheus_client import Gauge, start_http_server, Counter, Histogram
 from telethon import TelegramClient, events, Button
+import telethon.utils
 
 from gallery_dl_sub_bot.auth_manager import AuthManager
 from gallery_dl_sub_bot.date_format import format_last_check
@@ -34,6 +35,7 @@ start_usage_count = function_usage_count.labels(function="Start menu")
 subscription_menu_summon_count = function_usage_count.labels(function="Summon subscription menu")
 gallery_dl_update_menu_summon_count = function_usage_count.labels(function="Summon update menu")
 raw_download_usage_count = function_usage_count.labels(function="Raw download request")
+spoiler_usage_count = function_usage_count.labels(function="Spoiler")
 unknown_command_usage_count = function_usage_count.labels(function="Unknown command")
 embed_request_count = function_usage_count.labels(function="Embed request")
 zip_request_count = function_usage_count.labels(function="Zip request")
@@ -101,6 +103,7 @@ class Bot:
             events.NewMessage(pattern="/update_gallery_dl", incoming=True)
         )
         self.client.add_event_handler(self.raw_download, events.NewMessage(pattern="/raw", incoming=True))
+        self.client.add_event_handler(self.spoiler, events.NewMessage(pattern="/spoiler", incoming=True))
         self.client.add_event_handler(self.unknown_command, events.NewMessage(pattern="/", incoming=True))
         self.client.add_event_handler(self.check_for_links, events.NewMessage(incoming=True))
         self.client.add_event_handler(self.handle_embed_callback, events.CallbackQuery(pattern="embed:"))
@@ -820,6 +823,44 @@ class Bot:
             dl_args += ["-c", config_path]
         # Run the download
         await self._handle_link(dl_args, event, allow_auto_embed=False)
+        raise events.StopPropagation
+
+    async def spoiler(self, event: events.NewMessage.Event) -> None:
+        user_id = event.sender_id
+        logger.info("Request to spoiler a message from user_id %s", user_id)
+        # Check if they are authorised to use the bot
+        if not self.auth_manager.user_is_trusted(user_id):
+            failed_auth_attempts.inc()
+            logger.info("Unauthorised user has tried to update gallery-dl: %s", user_id)
+            await event.reply("Apologies, you are not authorised to operate this bot")
+            raise events.StopPropagation
+        # Check if this is a reply to something
+        reply_to = await event.message.get_reply_message()
+        if reply_to is None:
+            logger.info("User did not reply to a message when requesting spoiler: %s", user_id)
+            await event.reply("Please reply to the message which you want to spoiler media for")
+            raise events.StopPropagation
+        # Get the message caption, to use when re-sending
+        caption = reply_to.text
+        # Fetch the photo from that message, if applicable, and repost it as spoilered photo
+        photo = reply_to.photo
+        if photo is not None:
+            input_photo = telethon.utils.get_input_photo(photo)
+            input_photo.spoiler = True
+            logger.info("Sending spoilered photo to user %s", user_id)
+            await event.reply(caption, photo=input_photo)
+            raise events.StopPropagation
+        # Fetch the document from that message, if applicable, and repost it as spoilered document
+        document = reply_to.document
+        if document is None:
+            input_document = telethon.utils.get_input_document(document)
+            input_document.spoiler = True
+            logger.info("Sending spoilered document to user %s", user_id)
+            await event.reply(caption, document=input_document)
+            raise events.StopPropagation
+        # No media on the message, return an error message
+        logger.info("User replied to a text only message asking for spoiler")
+        await event.reply("Please reply to a message with a photo or video, in order to spoiler the media")
         raise events.StopPropagation
 
     # noinspection PyMethodMayBeStatic
