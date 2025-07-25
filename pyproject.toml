@@ -19,6 +19,7 @@ aiorwlock = "^1.4.0"
 prometheus-client = "^0.21.0"
 deepmerge = "^2.0"
 pillow = "^11.2.1"
+click = "^8.2.1"
 
 
 [build-system]

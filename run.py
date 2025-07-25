@@ -4,10 +4,12 @@ import os
 import sys
 from logging.handlers import TimedRotatingFileHandler
 
+import click
+
 from gallery_dl_sub_bot.bot import Bot
 
 
-def setup_logging() -> None:
+def setup_logging(log_level: str = "INFO") -> None:
     os.makedirs("logs", exist_ok=True)
     formatter = logging.Formatter("{asctime}:{levelname}:{name}:{message}", style="{")
 
@@ -22,11 +24,20 @@ def setup_logging() -> None:
     file_handler = TimedRotatingFileHandler("logs/gallery_dl_sub_bot.log", when="midnight")
     file_handler.setFormatter(formatter)
     bot_logger.addHandler(file_handler)
+    bot_logger.setLevel(log_level.upper())
+
+
+@click.command()
+@click.option("--log-level", type=str, help="Log level for the logger", default="INFO")
+def main(
+        log_level: str,
+):
+    setup_logging(log_level)
+    bot = Bot(config)
+    bot.run()
 
 
 if __name__ == '__main__':
-    setup_logging()
     with open("config.json", "r") as f:
         config = json.load(f)
-    bot = Bot(config)
-    bot.run()
+    main()
