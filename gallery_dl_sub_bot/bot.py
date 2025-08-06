@@ -855,7 +855,7 @@ class Bot:
             raise events.StopPropagation
         # Fetch the document from that message, if applicable, and repost it as spoilered document
         document = reply_to.document
-        if document is None:
+        if document is not None:
             input_document = telethon.utils.get_input_document(document)
             input_media = InputMediaDocument(input_document, spoiler=True)
             logger.info("Sending spoilered document to user %s", user_id)
