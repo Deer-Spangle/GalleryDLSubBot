@@ -7,11 +7,17 @@ link_fixes:
     to: twitter.com
   - from: x.com
     to: twitter.com
+  - from: girlcockx.com
+    to: twitter.com
+  - from: xcancel.com
+    to: twitter.com
   - from: www.twitter.com
     to: twitter.com
   - from: twitter.com
     to:
       query: ""
+  - from: fxbsky.app
+    to: bsky.app
   - type: regex
     _comment: "Adding trailing backslash to twitter profile URLs, to deduplicate subscriptions"
     from: "twitter.com/([^/]+)$"
