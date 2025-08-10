@@ -59,6 +59,17 @@ class LinkFix(LinkMatcher):
         return urllib.parse.urlunparse(parsed)
 
 
+class RedditLinkFix(LinkFix):
+    def __init__(self) -> None:
+        super().__init__({}, {})
+
+    def matches_link(self, link: str) -> bool:
+        return "reddit.com/comments" in link
+
+    def fix_link(self, link: str) -> str:
+        return link.replace("reddit.com/comments", "reddit.com/gallery")
+
+
 class CaptionOverride(LinkMatcher):
     """
     A CaptionOverride entry will, if it matches a given subscription link, parse the gallery-dl JSON entry for the item
@@ -112,6 +123,8 @@ class LinkFixer:
                 logger.error("Caption override in settings missing 'caption' field: {caption_override}")
                 raise ValueError("Caption override in settings missing 'caption' field")
             new_caption_overrides.append(CaptionOverride(caption_override["match"], caption_override["caption"]))
+
+        new_fixes.append(RedditLinkFix())
         self.fixes = new_fixes
         self.caption_overrides = new_caption_overrides
 
