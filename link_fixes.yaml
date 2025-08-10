@@ -7,9 +7,22 @@ link_fixes:
     to: twitter.com
   - from: x.com
     to: twitter.com
+  - from: www.twitter.com
+    to: twitter.com
   - from: twitter.com
     to:
       query: ""
+  - type: regex
+    _comment: "Adding trailing backslash to twitter profile URLs, to deduplicate subscriptions"
+    from: "twitter.com/([^/]+)$"
+    to: "twitter.com/\\1/"
+  - type: regex
+    _comment: "Adding trailing backslash to bluesky profile URLs, to deduplicate subscriptions"
+    from: "bsky.app/profile/([^/]+)/$"
+    to: "bsky.app/profile/\\1"
 caption_overrides:
   - match: twitter.com
     caption: "https://twitter.com/{{data.user.name}}/status/{{data.tweet_id}}"
+
+
+

@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import urllib.parse
 from abc import ABC
 from typing import Optional
@@ -70,6 +71,19 @@ class RedditLinkFix(LinkFix):
         return link.replace("reddit.com/comments", "reddit.com/gallery")
 
 
+class RegexLinkFix(LinkFix):
+    def __init__(self, link_pattern: str, link_target: str) -> None:
+        super().__init__(link_pattern, link_target)
+
+    def matches_link(self, link: str) -> bool:
+        pattern = re.compile(self.link_match)
+        return pattern.search(link) is not None
+
+    def fix_link(self, link: str) -> str:
+        pattern = re.compile(self.link_match)
+        return pattern.sub(self.link_target, link)
+
+
 class CaptionOverride(LinkMatcher):
     """
     A CaptionOverride entry will, if it matches a given subscription link, parse the gallery-dl JSON entry for the item
@@ -112,6 +126,9 @@ class LinkFixer:
             if "to" not in fix:
                 logger.error(f"Link fix in settings missing 'to' field: {fix}")
                 raise ValueError("Link fix in settings missing 'to' field")
+            if fix.get("type") == "regex":
+                new_fixes.append(RegexLinkFix(fix["from"], fix["to"]))
+                continue
             new_fixes.append(LinkFix(fix["from"], fix["to"]))
         # Load caption overrides from config
         new_caption_overrides: list[CaptionOverride] = []
