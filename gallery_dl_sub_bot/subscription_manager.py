@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
+import os
 import uuid
 from asyncio import Task
 from typing import Optional
@@ -83,6 +84,7 @@ subscription_total_items_stored = Gauge(
 
 class SubscriptionManager:
     CONFIG_FILE = "subscriptions.json"
+    CONFIG_FILE_BAK = "subscriptions.json.bak"
     SUB_UPDATE_AFTER = datetime.timedelta(hours=5)
 
     def __init__(self, client: TelegramClient, dl_manager: GalleryDLManager, link_fixer: LinkFixer) -> None:
@@ -132,8 +134,9 @@ class SubscriptionManager:
             "subscriptions": [s.to_json() for s in self.subscriptions[:]],
             "complete_downloads": [dl.to_json() for dl in self.complete_downloads[:]],
         }
-        with open(self.CONFIG_FILE, "w") as f:
+        with open(self.CONFIG_FILE_BAK, "w") as f:
             json.dump(config_data, f, indent=2)
+        os.replace(self.CONFIG_FILE_BAK, self.CONFIG_FILE)
 
     def download_for_link(self, link: str) -> Optional[Download]:
         for download in self.all_downloads:
