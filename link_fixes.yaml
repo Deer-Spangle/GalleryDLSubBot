@@ -29,6 +29,11 @@ link_fixes:
 caption_overrides:
   - match: twitter.com
     caption: "https://twitter.com/{{data.user.name}}/status/{{data.tweet_id}}"
-
-
-
+  - match: bsky.app
+    caption: "https://bsky.app/profile/{{data.author.handle}}/post/{{data.post_id}}"
+  - match: imgur.com
+    caption: "https://imgur.com/gallery/{{data.album.account.username}}-{{data.album.get('seo_title','')}}-{{data.album.id}}"
+  - match: www.weasyl.com
+    caption: "https://weasyl.com/~{{data.owner_login}}/submissions/{{data.submitid}}/{{data.title|replace(' ','-')}}"
+  - match: itaku.ee
+    caption: "https://itaku.ee/images/{{data.id}}"
