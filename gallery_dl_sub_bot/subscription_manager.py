@@ -257,7 +257,9 @@ class SubscriptionManager:
 
     async def _check_for_updates(self) -> None:
         logger.info("Checking which subscriptions need update")
-        for sub in self.subscriptions[:]:
+        for sub in self.subscriptions[:]
+            if not self.running:
+                return
             latest_check_if_updates_needed_time.set_to_current_time()
             # Check if subscription needs update
             now = datetime.datetime.now(datetime.timezone.utc)
